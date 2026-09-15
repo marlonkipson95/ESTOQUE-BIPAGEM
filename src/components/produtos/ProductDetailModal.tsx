@@ -16,6 +16,8 @@ import {
   Unlink,
   Search,
   Boxes,
+  DollarSign,
+  Tag,
 } from 'lucide-react';
 import { Product, ProductCodeHistory, CodeType } from '../../types';
 import { storageService } from '../../services/storageService';
@@ -49,6 +51,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   );
   const [quantidade, setQuantidade] = useState(product.quantidade);
   const [estoqueMinimo, setEstoqueMinimo] = useState(product.estoque_minimo || 5);
+
+  const [custoUnitario, setCustoUnitario] = useState<number | string>(product.custo_unitario ?? 0);
+  const [precoTabela, setPrecoTabela] = useState<number | string>(product.preco_tabela ?? 0);
+  const [precoSugerido, setPrecoSugerido] = useState<number | string>(product.preco_sugerido ?? 0);
+  const [precoMinimo, setPrecoMinimo] = useState<number | string>(product.preco_minimo ?? 0);
 
   const [corredor, setCorredor] = useState(product.corredor || '');
   const [baia, setBaia] = useState(product.baia || '');
@@ -114,6 +121,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       descricao: descricao.trim(),
       codigo_fabrica: codigoFabrica.trim(),
       codigos_alternativos: altArray,
+      custo_unitario: Number(custoUnitario) || 0,
+      preco_tabela: Number(precoTabela) || 0,
+      preco_sugerido: Number(precoSugerido) || 0,
+      preco_minimo: Number(precoMinimo) || 0,
       quantidade: Number(quantidade) || 0,
       estoqueMinimo: Number(estoqueMinimo) || 5,
       corredor: corredor.trim(),
@@ -474,6 +485,120 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     >
                       +5
                     </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* VALORES E PREÇOS (CUSTO CONFIDENCIAL + PREÇOS DE VENDA) */}
+              <div className="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-3">
+                <div className="flex items-center gap-2">
+                  <DollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  <span className="font-black text-xs uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                    Valores Financeiros & Precificação
+                  </span>
+                </div>
+
+                {/* CUSTO DE AQUISIÇÃO - SIGILOSO */}
+                <div className="p-3.5 rounded-xl border-2 border-amber-300/80 bg-amber-50/70 dark:border-amber-700/60 dark:bg-amber-950/20">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <label className="font-black text-xs text-amber-900 dark:text-amber-300">
+                        Custo de Aquisição (Compra - SIGILOSO)
+                      </label>
+                    </div>
+                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-amber-200 text-amber-900 dark:bg-amber-900/60 dark:text-amber-200">
+                      Interno / Restrito
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 font-mono font-bold text-amber-800 dark:text-amber-300 text-sm">
+                      R$
+                    </span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={custoUnitario}
+                      onChange={e => setCustoUnitario(e.target.value)}
+                      placeholder="0,00"
+                      className="w-full rounded-lg border-2 border-amber-300 bg-white pl-10 pr-3 py-2 font-mono font-black text-base text-amber-950 dark:border-amber-700 dark:bg-slate-900 dark:text-amber-200"
+                    />
+                  </div>
+                  <p className="text-[10px] text-amber-700 dark:text-amber-400/90 mt-1.5 leading-tight">
+                    * Confidencial: exibido unicamente aqui no detalhe do produto. Não aparece na consulta geral nem na tela de bipagem.
+                  </p>
+                </div>
+
+                {/* 3 PREÇOS DE VENDA (TABELA, SUGERIDO, MÍNIMO) */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  <div className="p-2.5 rounded-xl border border-blue-200 bg-blue-50/50 dark:border-blue-900/40 dark:bg-blue-950/20">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] uppercase font-black text-blue-700 dark:text-blue-300">
+                        Preço Tabela
+                      </span>
+                      <Tag className="h-3 w-3 text-blue-500" />
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-[11px] font-bold text-blue-600 dark:text-blue-400">
+                        R$
+                      </span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={precoTabela}
+                        onChange={e => setPrecoTabela(e.target.value)}
+                        placeholder="0,00"
+                        className="w-full rounded-lg border border-blue-200 bg-white pl-8 pr-2 py-1.5 font-mono font-bold text-xs text-blue-900 dark:border-blue-800 dark:bg-slate-900 dark:text-blue-200 text-right"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] uppercase font-black text-emerald-700 dark:text-emerald-300">
+                        Preço Sugerido
+                      </span>
+                      <Tag className="h-3 w-3 text-emerald-500" />
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+                        R$
+                      </span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={precoSugerido}
+                        onChange={e => setPrecoSugerido(e.target.value)}
+                        placeholder="0,00"
+                        className="w-full rounded-lg border border-emerald-200 bg-white pl-8 pr-2 py-1.5 font-mono font-bold text-xs text-emerald-900 dark:border-emerald-800 dark:bg-slate-900 dark:text-emerald-200 text-right"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl border border-purple-200 bg-purple-50/50 dark:border-purple-900/40 dark:bg-purple-950/20">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[10px] uppercase font-black text-purple-700 dark:text-purple-300">
+                        Preço Mínimo
+                      </span>
+                      <Tag className="h-3 w-3 text-purple-500" />
+                    </div>
+                    <div className="relative">
+                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-[11px] font-bold text-purple-600 dark:text-purple-400">
+                        R$
+                      </span>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={precoMinimo}
+                        onChange={e => setPrecoMinimo(e.target.value)}
+                        placeholder="0,00"
+                        className="w-full rounded-lg border border-purple-200 bg-white pl-8 pr-2 py-1.5 font-mono font-bold text-xs text-purple-900 dark:border-purple-800 dark:bg-slate-900 dark:text-purple-200 text-right"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

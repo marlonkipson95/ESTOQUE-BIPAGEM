@@ -424,31 +424,69 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
                       {product.descricao}
                     </h3>
 
-                    {/* Codes Information Grid */}
-                    <div className="mt-3 space-y-1 text-xs text-slate-600 dark:text-slate-300 font-mono">
-                      <div className="flex justify-between border-b border-slate-100 pb-1 dark:border-slate-800">
-                        <span className="text-slate-400 font-sans">Cód. Fábrica:</span>
-                        <strong className="text-slate-900 dark:text-white">{product.codigo_fabrica || '—'}</strong>
+                    {/* Destaque do Código de Fábrica */}
+                    <div className="mt-3 rounded-xl bg-indigo-50/70 p-2.5 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-between">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+                        Cód. Fábrica:
+                      </span>
+                      <strong className="font-mono text-base sm:text-lg font-black text-slate-900 dark:text-white">
+                        {product.codigo_fabrica || '—'}
+                      </strong>
+                    </div>
+
+                    {/* Localização Física em Destaque Especial */}
+                    <div className="mt-3">
+                      <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-1">
+                        <MapPin className="h-3.5 w-3.5 text-amber-500" />
+                        <span>Localização no Estoque</span>
                       </div>
-                      <div className="flex justify-between border-b border-slate-100 pb-1 dark:border-slate-800">
-                        <span className="text-slate-400 font-sans">Cód. Barras:</span>
-                        <strong className="text-slate-900 dark:text-white">{product.codigo_barras_atual || 'Não cadastrado'}</strong>
+                      <div className="grid grid-cols-3 gap-1.5 text-center bg-slate-900 text-white rounded-xl p-2.5 border border-slate-800 shadow-sm">
+                        <div className="rounded-lg bg-slate-800/80 py-1">
+                          <span className="block text-[9px] uppercase font-bold text-amber-300">Corredor</span>
+                          <span className="font-mono text-base sm:text-xl font-black text-amber-400">
+                            {product.corredor || '—'}
+                          </span>
+                        </div>
+                        <div className="rounded-lg bg-slate-800/80 py-1">
+                          <span className="block text-[9px] uppercase font-bold text-emerald-300">Baia</span>
+                          <span className="font-mono text-base sm:text-xl font-black text-emerald-400">
+                            {product.baia || '—'}
+                          </span>
+                        </div>
+                        <div className="rounded-lg bg-slate-800/80 py-1">
+                          <span className="block text-[9px] uppercase font-bold text-sky-300">Nível</span>
+                          <span className="font-mono text-base sm:text-xl font-black text-sky-400">
+                            {product.nivel || '—'}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
-                    {/* Prominent Location Display */}
-                    <div className="mt-4">
-                      <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1">
-                        Localização Física
+                    {/* Preços de Venda (Tabela, Sugerido, Mínimo) */}
+                    <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800">
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                        Valores de Venda
+                      </span>
+                      <div className="grid grid-cols-3 gap-1.5 text-center">
+                        <div className="rounded-lg bg-slate-50 p-1.5 border border-slate-200/70 dark:bg-slate-800/50 dark:border-slate-700/60">
+                          <span className="block text-[9px] font-semibold text-slate-500 dark:text-slate-400 uppercase">Tabela</span>
+                          <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">
+                            {product.preco_tabela ? `R$ ${product.preco_tabela.toFixed(2)}` : '—'}
+                          </span>
+                        </div>
+                        <div className="rounded-lg bg-indigo-50/70 p-1.5 border border-indigo-100 dark:bg-indigo-950/30 dark:border-indigo-900/60">
+                          <span className="block text-[9px] font-bold text-indigo-700 dark:text-indigo-300 uppercase">Sugerido</span>
+                          <span className="font-mono text-xs font-black text-indigo-700 dark:text-indigo-300">
+                            {product.preco_sugerido ? `R$ ${product.preco_sugerido.toFixed(2)}` : '—'}
+                          </span>
+                        </div>
+                        <div className="rounded-lg bg-emerald-50/70 p-1.5 border border-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-900/60">
+                          <span className="block text-[9px] font-bold text-emerald-700 dark:text-emerald-300 uppercase">Mínimo</span>
+                          <span className="font-mono text-xs font-black text-emerald-700 dark:text-emerald-300">
+                            {product.preco_minimo ? `R$ ${product.preco_minimo.toFixed(2)}` : '—'}
+                          </span>
+                        </div>
                       </div>
-                      <LocationBadge
-                        corredor={product.corredor}
-                        baia={product.baia}
-                        nivel={product.nivel}
-                        locacao={product.locacao}
-                        size="compact"
-                        className="w-full justify-start py-2"
-                      />
                     </div>
                   </div>
 

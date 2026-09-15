@@ -35,7 +35,10 @@ export interface Product {
   codigo_atual: string; // Código Interno ÚNICO do produto (ex: '00001258' ou 'PRD-0001')
   codigo_fabrica: string; // Factory/Original part number (e.g. 'ABC-4589')
   descricao: string; // Product name/description
-  custo_unitario: number; // Unit cost in BRL
+  custo_unitario: number; // Unit cost in BRL (exibido apenas em visualização detalhada)
+  preco_tabela?: number; // Preço Tabela
+  preco_sugerido?: number; // Preço Sugerido
+  preco_minimo?: number; // Preço Mínimo
   quantidade: number; // Current stock count
   estoque_minimo?: number; // Minimum safe stock
   codigo_barras_atual: string; // Current active barcode / EAN (e.g. '7891234567890')

@@ -563,11 +563,24 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
                 </span>
               </div>
 
-              {/* Descrição do Produto */}
-              <div className="mt-4">
-                <h3 className="text-xl md:text-2xl font-black text-slate-900 dark:text-white leading-snug">
-                  {scanResult.product.descricao}
-                </h3>
+              {/* CÓDIGO DE FÁBRICA EM DESTAQUE MÁXIMO PARA CONFERÊNCIA DA PEÇA */}
+              <div className="mt-4 rounded-2xl border-2 border-indigo-500/50 bg-indigo-50/80 p-4 dark:border-indigo-800/80 dark:bg-indigo-950/40 shadow-sm">
+                <span className="text-[11px] font-black uppercase tracking-widest text-indigo-700 dark:text-indigo-300 block mb-1">
+                  CÓDIGO ORIGINAL / FÁBRICA (CONFERÊNCIA DA PEÇA):
+                </span>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-mono text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-wide">
+                    {scanResult.product.codigo_fabrica || '—'}
+                  </span>
+                  <span className="rounded-lg bg-indigo-600 px-3 py-1 font-mono text-xs font-black text-white shrink-0">
+                    ID: {scanResult.product.id}
+                  </span>
+                </div>
+                {scanResult.product.descricao && scanResult.product.descricao !== `PRODUTO ${scanResult.product.codigo_fabrica}` && (
+                  <p className="text-xs text-slate-600 dark:text-slate-300 font-medium mt-1">
+                    {scanResult.product.descricao}
+                  </p>
+                )}
               </div>
 
               {/* DESTAQUE PRINCIPAL: LOCALIZAÇÃO FÍSICA NO ARMAZÉM */}
@@ -624,6 +637,33 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
                   <span className="font-mono text-lg md:text-xl font-black tracking-widest text-indigo-300">
                     {scanResult.product.locacao || `${scanResult.product.corredor || '0'}-${scanResult.product.baia || '0'}-${scanResult.product.nivel || '0'}`}
                   </span>
+                </div>
+              </div>
+
+              {/* VALORES DE VENDA (TABELA, SUGERIDO, MÍNIMO) */}
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 shadow-sm">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-2">
+                  Tabela de Preços de Venda
+                </span>
+                <div className="grid grid-cols-3 gap-2 text-center">
+                  <div className="rounded-xl bg-slate-50 p-2 border border-slate-200/70 dark:bg-slate-800/60 dark:border-slate-700/60">
+                    <span className="block text-[9px] uppercase font-bold text-slate-500 dark:text-slate-400">Preço Tabela</span>
+                    <span className="font-mono text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                      {scanResult.product.preco_tabela ? `R$ ${scanResult.product.preco_tabela.toFixed(2)}` : '—'}
+                    </span>
+                  </div>
+                  <div className="rounded-xl bg-indigo-50/70 p-2 border border-indigo-100 dark:bg-indigo-950/40 dark:border-indigo-900/60">
+                    <span className="block text-[9px] uppercase font-black text-indigo-700 dark:text-indigo-300">Preço Sugerido</span>
+                    <span className="font-mono text-sm sm:text-base font-black text-indigo-700 dark:text-indigo-300">
+                      {scanResult.product.preco_sugerido ? `R$ ${scanResult.product.preco_sugerido.toFixed(2)}` : '—'}
+                    </span>
+                  </div>
+                  <div className="rounded-xl bg-emerald-50/70 p-2 border border-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-900/60">
+                    <span className="block text-[9px] uppercase font-black text-emerald-700 dark:text-emerald-300">Preço Mínimo</span>
+                    <span className="font-mono text-sm sm:text-base font-black text-emerald-700 dark:text-emerald-300">
+                      {scanResult.product.preco_minimo ? `R$ ${scanResult.product.preco_minimo.toFixed(2)}` : '—'}
+                    </span>
+                  </div>
                 </div>
               </div>
 

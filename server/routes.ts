@@ -71,6 +71,10 @@ async function loadProductExtras(client: any, product: any) {
   } else if (!Array.isArray(product.codigos_alternativos)) {
     product.codigos_alternativos = [];
   }
+  product.custo_unitario = Number(product.custo_unitario) || 0;
+  product.preco_tabela = Number(product.preco_tabela) || 0;
+  product.preco_sugerido = Number(product.preco_sugerido) || 0;
+  product.preco_minimo = Number(product.preco_minimo) || 0;
   return product;
 }
 
@@ -968,6 +972,9 @@ apiRouter.put('/produtos/:id', async (req: Request, res: Response) => {
     codigo_fabrica,
     codigo_barras_atual,
     custo_unitario,
+    preco_tabela,
+    preco_sugerido,
+    preco_minimo,
     quantidade,
     estoque_minimo,
     corredor,
@@ -1026,23 +1033,29 @@ apiRouter.put('/produtos/:id', async (req: Request, res: Response) => {
           codigo_fabrica = $3,
           codigo_barras_atual = $4,
           custo_unitario = $5,
-          quantidade = $6,
-          estoque_minimo = $7,
-          corredor = $8,
-          baia = $9,
-          nivel = $10,
-          locacao = $11,
+          preco_tabela = $6,
+          preco_sugerido = $7,
+          preco_minimo = $8,
+          quantidade = $9,
+          estoque_minimo = $10,
+          corredor = $11,
+          baia = $12,
+          nivel = $13,
+          locacao = $14,
           atualizado_em = NOW()
-        WHERE id = $12
+        WHERE id = $15
         RETURNING *
       `, [
         descricao?.trim() || prev.descricao,
         codigo_atual?.trim() || prev.codigo_atual,
         codigo_fabrica?.trim() || prev.codigo_fabrica,
         codigo_barras_atual?.trim() || prev.codigo_barras_atual,
-        Number(custo_unitario) ?? prev.custo_unitario,
-        parseInt(quantidade, 10) ?? prev.quantidade,
-        parseInt(estoque_minimo, 10) ?? prev.estoque_minimo,
+        custo_unitario !== undefined ? Number(custo_unitario) : prev.custo_unitario,
+        preco_tabela !== undefined ? Number(preco_tabela) : prev.preco_tabela,
+        preco_sugerido !== undefined ? Number(preco_sugerido) : prev.preco_sugerido,
+        preco_minimo !== undefined ? Number(preco_minimo) : prev.preco_minimo,
+        quantidade !== undefined ? parseInt(quantidade, 10) : prev.quantidade,
+        estoque_minimo !== undefined ? parseInt(estoque_minimo, 10) : prev.estoque_minimo,
         corredor?.trim() ?? prev.corredor,
         baia?.trim() ?? prev.baia,
         nivel?.trim() ?? prev.nivel,
