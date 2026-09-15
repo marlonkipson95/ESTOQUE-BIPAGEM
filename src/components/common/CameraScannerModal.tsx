@@ -74,7 +74,8 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
         // Continuous scanning
         codeReader.decodeFromVideoElement(videoRef.current!, (result, err) => {
           if (result && isSubscribed) {
-            const text = result.getText();
+            const rawText = result.getText();
+            const text = rawText ? rawText.trim().replace(/\s+/g, '') : '';
             if (text) {
               beepService.playSuccess();
               onScan(text);

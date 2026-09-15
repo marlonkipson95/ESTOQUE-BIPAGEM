@@ -100,24 +100,6 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             </span>
           </div>
 
-          {/* Quick credential alert banner */}
-          <div className="mb-5 rounded-2xl border border-indigo-500/30 bg-indigo-950/40 p-3.5 text-xs text-indigo-200">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <span className="font-bold text-white block mb-0.5">Credenciais de Acesso:</span>
-                <span className="text-slate-300">
-                  Usuário: <code className="text-amber-300 font-mono font-bold">estoque</code> | Senha: <code className="text-amber-300 font-mono font-bold">controle12</code>
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={fillDefaultCredentials}
-                className="shrink-0 rounded-lg bg-indigo-600/50 hover:bg-indigo-600 border border-indigo-400/40 px-2.5 py-1 text-[11px] font-bold text-white transition"
-              >
-                Preencher
-              </button>
-            </div>
-          </div>
 
           {error && (
             <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-rose-500/30 bg-rose-950/50 p-3.5 text-xs text-rose-300">

@@ -2,13 +2,12 @@ import pg from 'pg';
 const { Pool } = pg;
 
 // Environment variable strictly on server-side
-const connectionString = process.env.DATABASE_URL;
-
 let pool: pg.Pool | null = null;
 let isConnected = false;
 
 // Initialize PostgreSQL connection pool with SSL configured for Neon
 export function getDbPool(): pg.Pool | null {
+  const connectionString = process.env.DATABASE_URL;
   if (!connectionString) {
     return null;
   }
@@ -19,7 +18,7 @@ export function getDbPool(): pg.Pool | null {
       ssl: connectionString.includes('localhost')
         ? false
         : { rejectUnauthorized: false },
-      max: 10,
+      max: 5,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
     });
