@@ -96,7 +96,7 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="flex items-center gap-2 md:gap-3">
         {/* Database Sync Status */}
         <div
-          className={`hidden xs:flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold border ${
+          className={`hidden sm:flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold border ${
             dbStatus === 'connected'
               ? 'border-indigo-200 bg-indigo-50 text-indigo-700 dark:border-indigo-900/60 dark:bg-indigo-950/40 dark:text-indigo-300'
               : 'border-slate-200 bg-slate-100 text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400'
@@ -172,7 +172,7 @@ export const Header: React.FC<HeaderProps> = ({
           title="Abrir scanner de código de barras pela câmera"
         >
           <Camera className="h-4 w-4" />
-          <span className="hidden xs:inline">Câmera</span>
+          <span className="hidden sm:inline">Câmera</span>
         </button>
       </div>
     </header>

@@ -210,7 +210,7 @@ export default function App() {
         />
 
         {/* Scrollable Workspace Container */}
-        <main className="flex-1 overflow-y-auto px-4 py-5 md:px-8 md:py-6">
+        <main className="flex-1 overflow-y-auto px-3 py-4 pb-24 md:px-8 md:py-6 md:pb-8">
           {activeModule === 'dashboard' && (
             <DashboardView
               products={products}

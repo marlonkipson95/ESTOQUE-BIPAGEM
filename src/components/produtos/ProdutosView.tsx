@@ -264,14 +264,14 @@ export const ProdutosView: React.FC<ProdutosViewProps> = ({
             <div
               key={product.id}
               onClick={() => onSelectProduct(product)}
-              className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer space-y-2.5"
+              className="p-3.5 sm:p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer space-y-2"
             >
               <div className="flex items-start justify-between gap-2">
                 <span className="font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400">
                   {product.codigo_atual}
                 </span>
                 <span
-                  className={`rounded px-2 py-0.5 text-xs font-mono font-bold ${
+                  className={`rounded px-2 py-0.5 text-xs font-mono font-bold shrink-0 ${
                     product.quantidade <= 0
                       ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
                       : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
@@ -281,12 +281,22 @@ export const ProdutosView: React.FC<ProdutosViewProps> = ({
                 </span>
               </div>
 
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-tight">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-snug line-clamp-2">
                 {product.descricao}
               </h3>
 
-              <div className="text-xs text-slate-500 font-mono">
-                EAN: {product.codigo_barras_atual || 'Não cadastrado'}
+              {/* Destaque do Código de Fábrica / EAN no Mobile */}
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-mono">
+                {product.codigo_fabrica && (
+                  <span className="rounded bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900">
+                    Fábrica: {product.codigo_fabrica}
+                  </span>
+                )}
+                {product.codigo_barras_atual && (
+                  <span className="text-slate-500 text-[11px]">
+                    EAN: {product.codigo_barras_atual}
+                  </span>
+                )}
               </div>
 
               <LocationBadge

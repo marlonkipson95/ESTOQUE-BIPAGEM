@@ -211,10 +211,10 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full md:w-auto">
             <button
               onClick={() => setShowAdvancedFilters(prev => !prev)}
-              className={`inline-flex items-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition border ${
+              className={`flex-1 md:flex-initial inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-semibold transition border ${
                 showAdvancedFilters || activeFilterPills.length > 0
                   ? 'border-indigo-600 bg-indigo-50 text-indigo-700 dark:border-indigo-500 dark:bg-indigo-950/40 dark:text-indigo-300'
                   : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200'
@@ -231,11 +231,11 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
 
             <button
               onClick={onOpenQuickScan}
-              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white hover:bg-slate-800 dark:bg-indigo-600 dark:hover:bg-indigo-500 transition shadow-sm"
+              className="flex-1 md:flex-initial inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white hover:bg-slate-800 dark:bg-indigo-600 dark:hover:bg-indigo-500 transition shadow-sm"
               title="Bipar código com a câmera"
             >
               <Barcode className="h-4 w-4" />
-              <span className="hidden sm:inline">Bipar</span>
+              <span>Bipar</span>
             </button>
           </div>
         </div>
@@ -411,7 +411,7 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
                 return (
                   <div
                     key={product.id}
-                    className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-indigo-400 hover:shadow-md transition dark:border-slate-800 dark:bg-slate-900"
+                    className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-5 shadow-sm hover:border-indigo-400 hover:shadow-md transition dark:border-slate-800 dark:bg-slate-900"
                   >
                     {/* Top: Description and Stock Badge */}
                     <div>
@@ -420,7 +420,7 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
                           {product.codigo_atual}
                         </span>
                         <span
-                          className={`rounded-full px-2.5 py-0.5 text-xs font-black tracking-wide uppercase ${
+                          className={`rounded-full px-2.5 py-0.5 text-xs font-black tracking-wide uppercase shrink-0 ${
                             isOutOfStock
                               ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300'
                               : isLowStock
@@ -432,16 +432,16 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
                         </span>
                       </div>
 
-                      <h3 className="mt-2 text-base font-bold text-slate-900 dark:text-white line-clamp-2 leading-snug">
+                      <h3 className="mt-2 text-sm sm:text-base font-bold text-slate-900 dark:text-white line-clamp-2 leading-snug">
                         {product.descricao}
                       </h3>
 
                       {/* Destaque do Código de Fábrica */}
-                      <div className="mt-3 rounded-xl bg-indigo-50/70 p-2.5 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-between">
-                        <span className="text-[11px] font-black uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+                      <div className="mt-3 rounded-xl bg-indigo-50/70 p-2.5 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-between gap-2 min-w-0">
+                        <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-indigo-700 dark:text-indigo-300 shrink-0">
                           Cód. Fábrica:
                         </span>
-                        <strong className="font-mono text-base sm:text-lg font-black text-slate-900 dark:text-white">
+                        <strong className="font-mono text-sm sm:text-lg font-black text-slate-900 dark:text-white break-all text-right">
                           {product.codigo_fabrica || '—'}
                         </strong>
                       </div>
@@ -449,25 +449,25 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
                       {/* Localização Física em Destaque Especial */}
                       <div className="mt-3">
                         <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-1">
-                          <MapPin className="h-3.5 w-3.5 text-amber-500" />
+                          <MapPin className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                           <span>Localização no Estoque</span>
                         </div>
-                        <div className="grid grid-cols-3 gap-1.5 text-center bg-slate-900 text-white rounded-xl p-2.5 border border-slate-800 shadow-sm">
-                          <div className="rounded-lg bg-slate-800/80 py-1">
-                            <span className="block text-[9px] uppercase font-bold text-amber-300">Corredor</span>
-                            <span className="font-mono text-base sm:text-xl font-black text-amber-400">
+                        <div className="grid grid-cols-3 gap-1 sm:gap-1.5 text-center bg-slate-900 text-white rounded-xl p-2 sm:p-2.5 border border-slate-800 shadow-sm">
+                          <div className="rounded-lg bg-slate-800/80 py-1 min-w-0">
+                            <span className="block text-[8px] sm:text-[9px] uppercase font-bold text-amber-300">Corredor</span>
+                            <span className="font-mono text-base sm:text-xl font-black text-amber-400 truncate block">
                               {product.corredor || '—'}
                             </span>
                           </div>
-                          <div className="rounded-lg bg-slate-800/80 py-1">
-                            <span className="block text-[9px] uppercase font-bold text-emerald-300">Baia</span>
-                            <span className="font-mono text-base sm:text-xl font-black text-emerald-400">
+                          <div className="rounded-lg bg-slate-800/80 py-1 min-w-0">
+                            <span className="block text-[8px] sm:text-[9px] uppercase font-bold text-emerald-300">Baia</span>
+                            <span className="font-mono text-base sm:text-xl font-black text-emerald-400 truncate block">
                               {product.baia || '—'}
                             </span>
                           </div>
-                          <div className="rounded-lg bg-slate-800/80 py-1">
-                            <span className="block text-[9px] uppercase font-bold text-sky-300">Nível</span>
-                            <span className="font-mono text-base sm:text-xl font-black text-sky-400">
+                          <div className="rounded-lg bg-slate-800/80 py-1 min-w-0">
+                            <span className="block text-[8px] sm:text-[9px] uppercase font-bold text-sky-300">Nível</span>
+                            <span className="font-mono text-base sm:text-xl font-black text-sky-400 truncate block">
                               {product.nivel || '—'}
                             </span>
                           </div>
@@ -479,22 +479,22 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
                         <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
                           Valores de Venda
                         </span>
-                        <div className="grid grid-cols-3 gap-1.5 text-center">
-                          <div className="rounded-lg bg-slate-50 p-1.5 border border-slate-200/70 dark:bg-slate-800/50 dark:border-slate-700/60">
-                            <span className="block text-[9px] font-semibold text-slate-500 dark:text-slate-400 uppercase">Tabela</span>
-                            <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">
+                        <div className="grid grid-cols-3 gap-1 sm:gap-1.5 text-center">
+                          <div className="rounded-lg bg-slate-50 p-1.5 border border-slate-200/70 dark:bg-slate-800/50 dark:border-slate-700/60 min-w-0">
+                            <span className="block text-[8px] sm:text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">TABELA</span>
+                            <span className="font-mono text-[11px] sm:text-xs font-bold text-slate-800 dark:text-slate-200 truncate block mt-0.5">
                               {formatCurrency(product.preco_tabela)}
                             </span>
                           </div>
-                          <div className="rounded-lg bg-indigo-50/70 p-1.5 border border-indigo-100 dark:bg-indigo-950/30 dark:border-indigo-900/60">
-                            <span className="block text-[9px] font-bold text-indigo-700 dark:text-indigo-300 uppercase">Sugerido</span>
-                            <span className="font-mono text-xs font-black text-indigo-700 dark:text-indigo-300">
+                          <div className="rounded-lg bg-indigo-50/70 p-1.5 border border-indigo-100 dark:bg-indigo-950/30 dark:border-indigo-900/60 min-w-0">
+                            <span className="block text-[8px] sm:text-[9px] font-black text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">SUGERIDO</span>
+                            <span className="font-mono text-[11px] sm:text-xs font-black text-indigo-700 dark:text-indigo-300 truncate block mt-0.5">
                               {formatCurrency(product.preco_sugerido)}
                             </span>
                           </div>
-                          <div className="rounded-lg bg-emerald-50/70 p-1.5 border border-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-900/60">
-                            <span className="block text-[9px] font-bold text-emerald-700 dark:text-emerald-300 uppercase">Mínimo</span>
-                            <span className="font-mono text-xs font-black text-emerald-700 dark:text-emerald-300">
+                          <div className="rounded-lg bg-emerald-50/70 p-1.5 border border-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-900/60 min-w-0">
+                            <span className="block text-[8px] sm:text-[9px] font-black text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">MÍNIMO</span>
+                            <span className="font-mono text-[11px] sm:text-xs font-black text-emerald-700 dark:text-emerald-300 truncate block mt-0.5">
                               {formatCurrency(product.preco_minimo)}
                             </span>
                           </div>

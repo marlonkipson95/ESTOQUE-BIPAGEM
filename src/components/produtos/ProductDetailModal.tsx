@@ -251,24 +251,24 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-3 md:p-6 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-2 sm:p-4 md:p-6 backdrop-blur-sm">
       <div className="flex max-h-[92vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl dark:bg-slate-900 dark:text-white border border-slate-200 dark:border-slate-800 overflow-hidden">
         {/* Modal Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-5 py-4 dark:border-slate-800 dark:bg-slate-900/90">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white">
+        <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-3.5 sm:px-5 py-3 sm:py-4 dark:border-slate-800 dark:bg-slate-900/90 gap-2">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-indigo-600 text-white shrink-0">
               <Barcode className="h-5 w-5" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="font-mono text-xs font-black text-indigo-600 dark:text-indigo-400">
                   {currentProduct.codigo_atual}
                 </span>
-                <span className="rounded bg-slate-200 px-2 py-0.5 font-mono text-[10px] text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                  ID: {currentProduct.id} (Estável)
+                <span className="rounded bg-slate-200 px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                  ID: {currentProduct.id}
                 </span>
               </div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-white line-clamp-1">
+              <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white truncate">
                 {currentProduct.descricao}
               </h2>
             </div>
@@ -276,7 +276,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
           <button
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-white transition"
+            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-200 hover:text-slate-800 dark:hover:bg-slate-800 dark:hover:text-white transition shrink-0"
           >
             <X className="h-5 w-5" />
           </button>
@@ -534,8 +534,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   <div className="p-2.5 rounded-xl border border-blue-200 bg-blue-50/50 dark:border-blue-900/40 dark:bg-blue-950/20">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] uppercase font-black text-blue-700 dark:text-blue-300">
-                        Preço Tabela
+                      <span className="text-[10px] uppercase font-black tracking-wider text-blue-700 dark:text-blue-300">
+                        TABELA
                       </span>
                       <Tag className="h-3 w-3 text-blue-500" />
                     </div>
@@ -557,8 +557,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
                   <div className="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/40 dark:bg-emerald-950/20">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] uppercase font-black text-emerald-700 dark:text-emerald-300">
-                        Preço Sugerido
+                      <span className="text-[10px] uppercase font-black tracking-wider text-emerald-700 dark:text-emerald-300">
+                        SUGERIDO
                       </span>
                       <Tag className="h-3 w-3 text-emerald-500" />
                     </div>
@@ -580,8 +580,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 
                   <div className="p-2.5 rounded-xl border border-purple-200 bg-purple-50/50 dark:border-purple-900/40 dark:bg-purple-950/20">
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] uppercase font-black text-purple-700 dark:text-purple-300">
-                        Preço Mínimo
+                      <span className="text-[10px] uppercase font-black tracking-wider text-purple-700 dark:text-purple-300">
+                        MÍNIMO
                       </span>
                       <Tag className="h-3 w-3 text-purple-500" />
                     </div>

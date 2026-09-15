@@ -454,7 +454,7 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
         </p>
 
         {/* Big Input Form */}
-        <form onSubmit={handleSubmit} className="mt-6">
+        <form onSubmit={handleSubmit} className="mt-4 sm:mt-6">
           <div className="relative">
             <input
               ref={inputRef}
@@ -462,41 +462,43 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
               type="text"
               value={inputCode}
               onChange={e => setInputCode(e.target.value)}
-              placeholder="DIGITE OU BIPE O CÓDIGO (EAN / CÓD. FÁBRICA)"
+              placeholder="BIPE OU DIGITE O CÓDIGO (EAN / FÁBRICA)"
               disabled={isLoading}
-              className="w-full rounded-2xl border-4 border-indigo-600/30 bg-slate-50 px-6 py-5 text-center font-mono text-xl md:text-2xl font-black tracking-wider text-slate-900 placeholder-slate-400 transition focus:border-indigo-600 focus:bg-white focus:outline-none dark:bg-slate-800 dark:text-white"
+              className="w-full rounded-2xl border-2 sm:border-4 border-indigo-600/30 bg-slate-50 px-4 py-3.5 sm:px-6 sm:py-5 text-center font-mono text-base sm:text-2xl font-black tracking-wider text-slate-900 placeholder-slate-400 transition focus:border-indigo-600 focus:bg-white focus:outline-none dark:bg-slate-800 dark:text-white"
             />
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+          <div className="mt-3.5 sm:mt-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2 sm:gap-3">
             <button
               type="submit"
               disabled={!inputCode.trim() || isLoading}
-              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-bold text-white shadow-md hover:bg-indigo-500 disabled:opacity-50 transition"
+              className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3.5 sm:py-3 text-sm font-bold text-white shadow-md hover:bg-indigo-500 disabled:opacity-50 transition"
             >
               <Barcode className="h-4 w-4" />
               <span>{isLoading ? 'LOCALIZANDO...' : 'CONSULTAR CÓDIGO'}</span>
             </button>
 
-            <button
-              type="button"
-              onClick={onOpenQuickScan}
-              className="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition"
-            >
-              <Camera className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-              <span>CÂMERA</span>
-            </button>
-
-            {scanResult && (
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={handleClear}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 transition"
+                onClick={onOpenQuickScan}
+                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3 sm:py-3 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition"
               >
-                <RotateCcw className="h-4 w-4" />
-                <span>LIMPAR</span>
+                <Camera className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                <span>CÂMERA</span>
               </button>
-            )}
+
+              {scanResult && (
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white px-4 py-3 sm:py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 transition"
+                >
+                  <RotateCcw className="h-4 w-4" />
+                  <span>LIMPAR</span>
+                </button>
+              )}
+            </div>
           </div>
         </form>
       </div>
@@ -544,124 +546,131 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
               )}
 
               {/* Header Status */}
-              <div className="flex items-center justify-between border-b border-emerald-100 pb-3 dark:border-emerald-900/40">
-                <div className="flex items-center gap-2.5">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                    <CheckCircle2 className="h-6 w-6 text-emerald-600" />
+              <div className="flex items-center justify-between border-b border-emerald-100 pb-3 dark:border-emerald-900/40 gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 shrink-0">
+                    <CheckCircle2 className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-600" />
                   </div>
-                  <div>
-                    <span className="text-xs font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-400">
+                  <div className="min-w-0">
+                    <span className="text-[10px] sm:text-xs font-black uppercase tracking-widest text-emerald-700 dark:text-emerald-400 block truncate">
                       Mercadoria Identificada no Estoque
                     </span>
-                    <h2 className="text-lg md:text-xl font-black text-slate-900 dark:text-white">
+                    <h2 className="text-base sm:text-xl font-black text-slate-900 dark:text-white truncate">
                       PRODUTO LOCALIZADO
                     </h2>
                   </div>
                 </div>
 
-                <span className="font-mono text-xs font-bold rounded-lg bg-slate-100 px-3 py-1 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                  {scanResult.product.id}
+                <span className="font-mono text-xs font-bold rounded-lg bg-slate-100 px-2.5 py-1 text-slate-700 dark:bg-slate-800 dark:text-slate-300 shrink-0">
+                  #{scanResult.product.id}
                 </span>
               </div>
 
               {/* CÓDIGO DE FÁBRICA EM DESTAQUE MÁXIMO PARA CONFERÊNCIA DA PEÇA */}
-              <div className="mt-4 rounded-2xl border-2 border-indigo-500/50 bg-indigo-50/80 p-4 dark:border-indigo-800/80 dark:bg-indigo-950/40 shadow-sm">
-                <span className="text-[11px] font-black uppercase tracking-widest text-indigo-700 dark:text-indigo-300 block mb-1">
+              <div className="mt-4 rounded-2xl border-2 border-indigo-500/50 bg-indigo-50/80 p-3.5 sm:p-4 dark:border-indigo-800/80 dark:bg-indigo-950/40 shadow-sm">
+                <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-indigo-700 dark:text-indigo-300 block mb-1">
                   CÓDIGO ORIGINAL / FÁBRICA (CONFERÊNCIA DA PEÇA):
                 </span>
-                <div className="flex items-center justify-between gap-3">
-                  <span className="font-mono text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-wide">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono text-xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-wide break-all">
                     {scanResult.product.codigo_fabrica || '—'}
                   </span>
-                  <span className="rounded-lg bg-indigo-600 px-3 py-1 font-mono text-xs font-black text-white shrink-0">
+                  <span className="rounded-lg bg-indigo-600 px-2.5 py-1 font-mono text-xs font-black text-white shrink-0">
                     ID: {scanResult.product.id}
                   </span>
                 </div>
                 {scanResult.product.descricao && scanResult.product.descricao !== `PRODUTO ${scanResult.product.codigo_fabrica}` && (
-                  <p className="text-xs text-slate-600 dark:text-slate-300 font-medium mt-1">
+                  <p className="text-xs text-slate-600 dark:text-slate-300 font-medium mt-1.5 leading-snug">
                     {scanResult.product.descricao}
                   </p>
                 )}
               </div>
 
               {/* DESTAQUE PRINCIPAL: LOCALIZAÇÃO FÍSICA NO ARMAZÉM */}
-              <div className="mt-5 rounded-2xl border-2 border-indigo-600/40 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 p-5 text-white shadow-lg">
-                <div className="flex items-center justify-between border-b border-slate-700/80 pb-3">
-                  <div className="flex items-center gap-2 text-indigo-300">
-                    <MapPin className="h-6 w-6 text-amber-400 animate-pulse" />
-                    <span className="text-sm font-black tracking-widest uppercase text-amber-300">
+              <div className="mt-4 sm:mt-5 rounded-2xl border-2 border-indigo-600/40 bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 p-4 sm:p-5 text-white shadow-lg">
+                <div className="flex items-center justify-between border-b border-slate-700/80 pb-2.5 gap-2">
+                  <div className="flex items-center gap-1.5 sm:gap-2 text-indigo-300 min-w-0">
+                    <MapPin className="h-5 w-5 sm:h-6 sm:w-6 text-amber-400 animate-pulse shrink-0" />
+                    <span className="text-xs sm:text-sm font-black tracking-widest uppercase text-amber-300 truncate">
                       LOCALIZAÇÃO FÍSICA NO ARMAZÉM
                     </span>
                   </div>
 
                   <button
                     onClick={handleOpenEditLocation}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-500/30 border border-indigo-400/40 px-3.5 py-1.5 text-xs font-bold text-indigo-200 hover:bg-indigo-500/50 transition"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-500/30 border border-indigo-400/40 px-2.5 sm:px-3.5 py-1.5 text-xs font-bold text-indigo-200 hover:bg-indigo-500/50 transition shrink-0"
                   >
                     <Edit3 className="h-3.5 w-3.5" />
-                    <span>Alterar Locação</span>
+                    <span className="hidden sm:inline">Alterar Locação</span>
+                    <span className="sm:hidden">Alterar</span>
                   </button>
                 </div>
 
                 {/* CORREDOR | BAIA | NÍVEL EM DESTAQUE GIGANTE */}
-                <div className="mt-4 grid grid-cols-3 gap-3 text-center">
+                <div className="mt-3.5 grid grid-cols-3 gap-2 sm:gap-3 text-center">
                   {/* CORREDOR */}
-                  <div className="rounded-xl bg-slate-800/90 p-3 border border-slate-700 shadow-inner">
-                    <span className="block text-xs font-black uppercase tracking-wider text-amber-300 mb-1">Corredor</span>
-                    <span className="font-mono text-3xl md:text-4xl font-black text-amber-400">
+                  <div className="rounded-xl bg-slate-800/90 p-2 sm:p-3 border border-slate-700 shadow-inner min-w-0">
+                    <span className="block text-[10px] sm:text-xs font-black uppercase tracking-wider text-amber-300 mb-0.5 sm:mb-1">Corredor</span>
+                    <span className="font-mono text-2xl sm:text-4xl font-black text-amber-400 truncate block">
                       {scanResult.product.corredor || '—'}
                     </span>
                   </div>
 
                   {/* BAIA */}
-                  <div className="rounded-xl bg-slate-800/90 p-3 border border-slate-700 shadow-inner">
-                    <span className="block text-xs font-black uppercase tracking-wider text-emerald-300 mb-1">Baia</span>
-                    <span className="font-mono text-3xl md:text-4xl font-black text-emerald-400">
+                  <div className="rounded-xl bg-slate-800/90 p-2 sm:p-3 border border-slate-700 shadow-inner min-w-0">
+                    <span className="block text-[10px] sm:text-xs font-black uppercase tracking-wider text-emerald-300 mb-0.5 sm:mb-1">Baia</span>
+                    <span className="font-mono text-2xl sm:text-4xl font-black text-emerald-400 truncate block">
                       {scanResult.product.baia || '—'}
                     </span>
                   </div>
 
                   {/* NÍVEL */}
-                  <div className="rounded-xl bg-slate-800/90 p-3 border border-slate-700 shadow-inner">
-                    <span className="block text-xs font-black uppercase tracking-wider text-sky-300 mb-1">Nível</span>
-                    <span className="font-mono text-3xl md:text-4xl font-black text-sky-400">
+                  <div className="rounded-xl bg-slate-800/90 p-2 sm:p-3 border border-slate-700 shadow-inner min-w-0">
+                    <span className="block text-[10px] sm:text-xs font-black uppercase tracking-wider text-sky-300 mb-0.5 sm:mb-1">Nível</span>
+                    <span className="font-mono text-2xl sm:text-4xl font-black text-sky-400 truncate block">
                       {scanResult.product.nivel || '—'}
                     </span>
                   </div>
                 </div>
 
                 {/* Tag de Locação Completa */}
-                <div className="mt-3.5 flex items-center justify-between rounded-lg bg-slate-800/60 px-4 py-2 border border-slate-700/60">
-                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
-                    Código de Endereçamento:
+                <div className="mt-3 flex items-center justify-between rounded-lg bg-slate-800/60 px-3 py-2 border border-slate-700/60 text-xs">
+                  <span className="font-semibold text-slate-400 uppercase tracking-wide">
+                    Endereçamento:
                   </span>
-                  <span className="font-mono text-lg md:text-xl font-black tracking-widest text-indigo-300">
+                  <span className="font-mono text-base sm:text-xl font-black tracking-widest text-indigo-300">
                     {scanResult.product.locacao || `${scanResult.product.corredor || '0'}-${scanResult.product.baia || '0'}-${scanResult.product.nivel || '0'}`}
                   </span>
                 </div>
               </div>
 
               {/* VALORES DE VENDA (TABELA, SUGERIDO, MÍNIMO) */}
-              <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 shadow-sm">
-                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-2">
+              <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4 dark:border-slate-800 dark:bg-slate-900 shadow-sm">
+                <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-400 block mb-2">
                   Tabela de Preços de Venda
                 </span>
                 <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="rounded-xl bg-slate-50 p-2 border border-slate-200/70 dark:bg-slate-800/60 dark:border-slate-700/60">
-                    <span className="block text-[9px] uppercase font-bold text-slate-500 dark:text-slate-400">Preço Tabela</span>
-                    <span className="font-mono text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                  <div className="rounded-xl bg-slate-50 p-2 border border-slate-200/70 dark:bg-slate-800/60 dark:border-slate-700/60 min-w-0">
+                    <span className="block text-[9px] sm:text-[10px] uppercase font-black tracking-wider text-slate-500 dark:text-slate-400">
+                      TABELA
+                    </span>
+                    <span className="font-mono text-xs sm:text-base font-bold text-slate-900 dark:text-white truncate block mt-0.5">
                       {formatCurrency(scanResult.product.preco_tabela)}
                     </span>
                   </div>
-                  <div className="rounded-xl bg-indigo-50/70 p-2 border border-indigo-100 dark:bg-indigo-950/40 dark:border-indigo-900/60">
-                    <span className="block text-[9px] uppercase font-black text-indigo-700 dark:text-indigo-300">Preço Sugerido</span>
-                    <span className="font-mono text-sm sm:text-base font-black text-indigo-700 dark:text-indigo-300">
+                  <div className="rounded-xl bg-indigo-50/70 p-2 border border-indigo-100 dark:bg-indigo-950/40 dark:border-indigo-900/60 min-w-0">
+                    <span className="block text-[9px] sm:text-[10px] uppercase font-black tracking-wider text-indigo-700 dark:text-indigo-300">
+                      SUGERIDO
+                    </span>
+                    <span className="font-mono text-xs sm:text-base font-black text-indigo-700 dark:text-indigo-300 truncate block mt-0.5">
                       {formatCurrency(scanResult.product.preco_sugerido)}
                     </span>
                   </div>
-                  <div className="rounded-xl bg-emerald-50/70 p-2 border border-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-900/60">
-                    <span className="block text-[9px] uppercase font-black text-emerald-700 dark:text-emerald-300">Preço Mínimo</span>
-                    <span className="font-mono text-sm sm:text-base font-black text-emerald-700 dark:text-emerald-300">
+                  <div className="rounded-xl bg-emerald-50/70 p-2 border border-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-900/60 min-w-0">
+                    <span className="block text-[9px] sm:text-[10px] uppercase font-black tracking-wider text-emerald-700 dark:text-emerald-300">
+                      MÍNIMO
+                    </span>
+                    <span className="font-mono text-xs sm:text-base font-black text-emerald-700 dark:text-emerald-300 truncate block mt-0.5">
                       {formatCurrency(scanResult.product.preco_minimo)}
                     </span>
                   </div>
@@ -830,16 +839,16 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
                 )}
 
               {/* Botões de Ação */}
-              <div className="mt-6 flex flex-wrap gap-3">
+              <div className="mt-6 flex flex-col sm:flex-row gap-2.5 sm:gap-3">
                 <button
                   onClick={() => onSelectProduct(scanResult.product!)}
-                  className="flex-1 rounded-xl bg-slate-900 py-3 text-center text-sm font-bold text-white hover:bg-slate-800 dark:bg-indigo-600 dark:hover:bg-indigo-500 shadow-md"
+                  className="flex-1 rounded-xl bg-slate-900 py-3.5 sm:py-3 text-center text-sm font-bold text-white hover:bg-slate-800 dark:bg-indigo-600 dark:hover:bg-indigo-500 shadow-md transition"
                 >
                   VER FICHA COMPLETA
                 </button>
                 <button
                   onClick={handleClear}
-                  className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                  className="rounded-xl border border-slate-300 bg-white px-5 py-3.5 sm:py-3 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 transition"
                 >
                   BIPAR PRÓXIMO
                 </button>
@@ -1060,18 +1069,18 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-3 pt-3">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 sm:gap-3 pt-3">
                 <button
                   type="button"
                   onClick={() => setIsEditingLocation(false)}
-                  className="rounded-xl border border-slate-300 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300"
+                  className="rounded-xl border border-slate-300 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 transition text-center"
                 >
                   Cancelar
                 </button>
                 <button
                   type="button"
                   onClick={handleSaveLocation}
-                  className="rounded-xl bg-indigo-600 px-5 py-2 text-xs font-bold text-white hover:bg-indigo-500 shadow"
+                  className="rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-indigo-500 shadow transition text-center"
                 >
                   Confirmar Nova Locação
                 </button>
