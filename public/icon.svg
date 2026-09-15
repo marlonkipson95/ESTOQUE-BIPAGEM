@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e293b"/>
+    </linearGradient>
+    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#4f46e5"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#bgGrad)"/>
+  
+  <!-- Barcode pattern -->
+  <g fill="#94a3b8" opacity="0.9">
+    <rect x="96" y="140" width="16" height="140" rx="4"/>
+    <rect x="124" y="140" width="8" height="140" rx="4"/>
+    <rect x="144" y="140" width="24" height="140" rx="4"/>
+    <rect x="180" y="140" width="12" height="140" rx="4"/>
+    <rect x="204" y="140" width="32" height="140" rx="4"/>
+    <rect x="248" y="140" width="8" height="140" rx="4"/>
+    <rect x="268" y="140" width="20" height="140" rx="4"/>
+    <rect x="300" y="140" width="12" height="140" rx="4"/>
+    <rect x="324" y="140" width="28" height="140" rx="4"/>
+    <rect x="364" y="140" width="16" height="140" rx="4"/>
+    <rect x="392" y="140" width="24" height="140" rx="4"/>
+  </g>
+  
+  <!-- Laser scan line -->
+  <line x1="80" y1="210" x2="432" y2="210" stroke="#f43f5e" stroke-width="8" stroke-linecap="round"/>
+  
+  <!-- Warehouse Location Box / Rack symbol -->
+  <g transform="translate(156, 310)">
+    <rect x="0" y="0" width="200" height="90" rx="16" fill="url(#accentGrad)"/>
+    <text x="100" y="42" fill="#ffffff" font-family="system-ui, sans-serif" font-weight="900" font-size="28" text-anchor="middle" letter-spacing="2">KIPSON</text>
+    <text x="100" y="72" fill="#fde047" font-family="system-ui, sans-serif" font-weight="700" font-size="18" text-anchor="middle" letter-spacing="3">ESTOQUE</text>
+  </g>
+</svg>
