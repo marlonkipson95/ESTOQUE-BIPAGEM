@@ -369,7 +369,10 @@ apiRouter.get('/produtos', async (req: Request, res: Response) => {
   } = req.query;
 
   const pageNum = Math.max(1, parseInt(page as string, 10) || 1);
-  const limitNum = Math.min(500, Math.max(1, parseInt(limit as string, 10) || 100));
+  const requestedLimit = parseInt(limit as string, 10);
+  const limitNum = (limit === 'all' || requestedLimit >= 50000)
+    ? 50000
+    : Math.min(50000, Math.max(1, requestedLimit || 100));
   const offset = (pageNum - 1) * limitNum;
 
   const pool = getDbPool();
@@ -456,8 +459,18 @@ apiRouter.get('/produtos', async (req: Request, res: Response) => {
         `;
         const dataRes = await client.query(dataQuery, [...params, limitNum, offset]);
 
+        const formattedProducts = dataRes.rows.map(p => ({
+          ...p,
+          quantidade: Number(p.quantidade) || 0,
+          estoque_minimo: Number(p.estoque_minimo) || 0,
+          custo_unitario: Number(p.custo_unitario) || 0,
+          preco_tabela: Number(p.preco_tabela) || 0,
+          preco_sugerido: Number(p.preco_sugerido) || 0,
+          preco_minimo: Number(p.preco_minimo) || 0,
+        }));
+
         return res.json({
-          products: dataRes.rows,
+          products: formattedProducts,
           total,
           page: pageNum,
           limit: limitNum,

@@ -28,6 +28,8 @@ const STORAGE_KEYS = {
 };
 
 class StorageService {
+  private inMemoryProducts: Product[] | null = null;
+
   constructor() {
     this.cleanupLegacyFictitiousData();
   }
@@ -88,17 +90,23 @@ class StorageService {
     if (typeof window === 'undefined') return;
     try {
       localStorage.setItem(key, JSON.stringify(value));
-    } catch (e) {
-      console.error(`Error saving to localStorage key "${key}":`, e);
+    } catch (e: any) {
+      console.warn(`[Storage] Armazenamento local da chave "${key}" mantido na memória RAM:`, e?.message);
     }
   }
 
   // --- Products ---
   getProducts(): Product[] {
-    return this.get<Product[]>(STORAGE_KEYS.PRODUCTS, []);
+    if (this.inMemoryProducts && this.inMemoryProducts.length > 0) {
+      return this.inMemoryProducts;
+    }
+    const fromStorage = this.get<Product[]>(STORAGE_KEYS.PRODUCTS, []);
+    this.inMemoryProducts = fromStorage;
+    return fromStorage;
   }
 
   saveProducts(products: Product[]): void {
+    this.inMemoryProducts = products;
     this.set(STORAGE_KEYS.PRODUCTS, products);
   }
 
@@ -915,7 +923,7 @@ class StorageService {
   // --- Synchronization with Neon PostgreSQL backend ---
   async syncWithBackend(): Promise<{ synced: boolean; count: number; error?: string }> {
     try {
-      const res = await apiService.getProducts({ limit: 1000 });
+      const res = await apiService.getProducts({ limit: 50000 });
       if (res && Array.isArray(res.products)) {
         this.saveProducts(res.products);
         return { synced: true, count: res.total ?? res.products.length };
@@ -928,6 +936,7 @@ class StorageService {
 
   // --- Reset to Clean Data ---
   resetToDefaultData(): void {
+    this.inMemoryProducts = [];
     this.set(STORAGE_KEYS.PRODUCTS, []);
     this.set(STORAGE_KEYS.CODE_HISTORY, []);
     this.set(STORAGE_KEYS.MOVEMENTS, []);

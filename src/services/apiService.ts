@@ -59,7 +59,7 @@ class ApiService {
     cadastro?: string;
     tipoCodigo?: string;
     page?: number;
-    limit?: number;
+    limit?: number | string;
   } = {}): Promise<{ products: Product[]; total: number; page: number; limit: number }> {
     const query = new URLSearchParams();
     if (params.search) query.set('search', params.search);

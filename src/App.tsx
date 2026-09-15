@@ -84,15 +84,21 @@ export default function App() {
     if (!authSession.isAuthenticated) return;
     refreshData();
 
-    // Sincronização periódica em segundo plano a cada 6 segundos para que
-    // qualquer cadastro/atualização feito em qualquer terminal/usuário apareça em todos os dispositivos
-    const syncInterval = setInterval(() => {
-      storageService.syncWithBackend().then(res => {
-        if (res.synced) {
-          setProducts(storageService.getProducts());
+    // Sincronização inteligente em segundo plano: verifica se o total do banco mudou
+    const syncInterval = setInterval(async () => {
+      try {
+        const stats = await apiService.getDashboardStats();
+        const currentCount = storageService.getProducts().length;
+        if (stats && stats.total_produtos !== undefined && stats.total_produtos !== currentCount) {
+          const res = await storageService.syncWithBackend();
+          if (res.synced) {
+            setProducts(storageService.getProducts());
+          }
         }
-      });
-    }, 6000);
+      } catch {
+        // Silencioso se offline
+      }
+    }, 12000);
 
     // Sincroniza imediatamente quando o operador foca ou volta para a aba do navegador
     const handleFocus = () => {
