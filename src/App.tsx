@@ -184,7 +184,7 @@ export default function App() {
 
   // 2. Authenticated Application
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-slate-100 font-sans text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100">
+    <div className="flex h-[100dvh] w-full overflow-hidden bg-slate-100 font-sans text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100">
       {/* Desktop Navigation Sidebar */}
       <Sidebar
         activeModule={activeModule}
@@ -210,7 +210,7 @@ export default function App() {
         />
 
         {/* Scrollable Workspace Container */}
-        <main className="flex-1 overflow-y-auto px-3 py-4 pb-24 md:px-8 md:py-6 md:pb-8">
+        <main className="flex-1 overflow-y-auto px-3 py-4 pb-24 md:px-8 md:py-6 md:pb-8 overscroll-y-contain">
           {activeModule === 'dashboard' && (
             <DashboardView
               products={products}

@@ -413,14 +413,20 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
                     key={product.id}
                     className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-5 shadow-sm hover:border-indigo-400 hover:shadow-md transition dark:border-slate-800 dark:bg-slate-900"
                   >
-                    {/* Top: Description and Stock Badge */}
                     <div>
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400">
-                          {product.codigo_atual}
-                        </span>
+                      {/* 1. CÓDIGO DE FÁBRICA & ESTOQUE */}
+                      <div className="flex items-start justify-between gap-2 border-b border-slate-100 dark:border-slate-800 pb-2.5">
+                        <div className="min-w-0 flex-1">
+                          <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-indigo-600 dark:text-indigo-400 block mb-0.5">
+                            CÓDIGO DE FÁBRICA
+                          </span>
+                          <strong className="font-mono text-base sm:text-xl font-black text-slate-900 dark:text-white break-all block leading-tight">
+                            {product.codigo_fabrica || product.codigo_atual || '—'}
+                          </strong>
+                        </div>
+
                         <span
-                          className={`rounded-full px-2.5 py-0.5 text-xs font-black tracking-wide uppercase shrink-0 ${
+                          className={`rounded-full px-2.5 py-1 text-xs font-black tracking-wide uppercase shrink-0 ${
                             isOutOfStock
                               ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300'
                               : isLowStock
@@ -432,69 +438,66 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
                         </span>
                       </div>
 
-                      <h3 className="mt-2 text-sm sm:text-base font-bold text-slate-900 dark:text-white line-clamp-2 leading-snug">
+                      {/* 2. DESCRIÇÃO */}
+                      <h3 className="mt-2.5 text-sm sm:text-base font-bold text-slate-900 dark:text-white line-clamp-2 leading-snug">
                         {product.descricao}
                       </h3>
 
-                      {/* Destaque do Código de Fábrica */}
-                      <div className="mt-3 rounded-xl bg-indigo-50/70 p-2.5 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-between gap-2 min-w-0">
-                        <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-indigo-700 dark:text-indigo-300 shrink-0">
-                          Cód. Fábrica:
-                        </span>
-                        <strong className="font-mono text-sm sm:text-lg font-black text-slate-900 dark:text-white break-all text-right">
-                          {product.codigo_fabrica || '—'}
-                        </strong>
-                      </div>
-
-                      {/* Localização Física em Destaque Especial */}
-                      <div className="mt-3">
+                      {/* 3. LOCALIZAÇÃO FÍSICA NO ESTOQUE */}
+                      <div className="mt-3.5">
                         <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-1">
                           <MapPin className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                           <span>Localização no Estoque</span>
                         </div>
-                        <div className="grid grid-cols-3 gap-1 sm:gap-1.5 text-center bg-slate-900 text-white rounded-xl p-2 sm:p-2.5 border border-slate-800 shadow-sm">
-                          <div className="rounded-lg bg-slate-800/80 py-1 min-w-0">
+                        <div className="grid grid-cols-3 gap-1.5 text-center bg-slate-900 text-white rounded-xl p-2 sm:p-2.5 border border-slate-800 shadow-sm">
+                          <div className="rounded-lg bg-slate-800/80 py-1.5 min-w-0">
                             <span className="block text-[8px] sm:text-[9px] uppercase font-bold text-amber-300">Corredor</span>
-                            <span className="font-mono text-base sm:text-xl font-black text-amber-400 truncate block">
+                            <span className="font-mono text-lg sm:text-2xl font-black text-amber-400 truncate block">
                               {product.corredor || '—'}
                             </span>
                           </div>
-                          <div className="rounded-lg bg-slate-800/80 py-1 min-w-0">
+                          <div className="rounded-lg bg-slate-800/80 py-1.5 min-w-0">
                             <span className="block text-[8px] sm:text-[9px] uppercase font-bold text-emerald-300">Baia</span>
-                            <span className="font-mono text-base sm:text-xl font-black text-emerald-400 truncate block">
+                            <span className="font-mono text-lg sm:text-2xl font-black text-emerald-400 truncate block">
                               {product.baia || '—'}
                             </span>
                           </div>
-                          <div className="rounded-lg bg-slate-800/80 py-1 min-w-0">
+                          <div className="rounded-lg bg-slate-800/80 py-1.5 min-w-0">
                             <span className="block text-[8px] sm:text-[9px] uppercase font-bold text-sky-300">Nível</span>
-                            <span className="font-mono text-base sm:text-xl font-black text-sky-400 truncate block">
+                            <span className="font-mono text-lg sm:text-2xl font-black text-sky-400 truncate block">
                               {product.nivel || '—'}
                             </span>
                           </div>
                         </div>
                       </div>
 
-                      {/* Preços de Venda (Tabela, Sugerido, Mínimo) */}
-                      <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800">
-                        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                          Valores de Venda
+                      {/* 4. PREÇOS DE VENDA (TABELA, SUGERIDO, MÍNIMO) - ALTO DESTAQUE E VISIBILIDADE */}
+                      <div className="mt-3.5 pt-3 border-t border-slate-200 dark:border-slate-800">
+                        <span className="block text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-2">
+                          Preços de Venda
                         </span>
-                        <div className="grid grid-cols-3 gap-1 sm:gap-1.5 text-center">
-                          <div className="rounded-lg bg-slate-50 p-1.5 border border-slate-200/70 dark:bg-slate-800/50 dark:border-slate-700/60 min-w-0">
-                            <span className="block text-[8px] sm:text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">TABELA</span>
-                            <span className="font-mono text-[11px] sm:text-xs font-bold text-slate-800 dark:text-slate-200 truncate block mt-0.5">
+                        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 text-center">
+                          <div className="rounded-xl bg-slate-100/90 p-2 sm:p-2.5 border-2 border-slate-300 dark:bg-slate-800 dark:border-slate-700 min-w-0 shadow-sm">
+                            <span className="block text-[10px] sm:text-[11px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-wider">
+                              TABELA
+                            </span>
+                            <span className="font-mono text-xs sm:text-sm md:text-base font-black text-slate-900 dark:text-white truncate block mt-0.5">
                               {formatCurrency(product.preco_tabela)}
                             </span>
                           </div>
-                          <div className="rounded-lg bg-indigo-50/70 p-1.5 border border-indigo-100 dark:bg-indigo-950/30 dark:border-indigo-900/60 min-w-0">
-                            <span className="block text-[8px] sm:text-[9px] font-black text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">SUGERIDO</span>
-                            <span className="font-mono text-[11px] sm:text-xs font-black text-indigo-700 dark:text-indigo-300 truncate block mt-0.5">
+                          <div className="rounded-xl bg-indigo-50 p-2 sm:p-2.5 border-2 border-indigo-300 dark:bg-indigo-950/60 dark:border-indigo-700 min-w-0 shadow-sm">
+                            <span className="block text-[10px] sm:text-[11px] font-black text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">
+                              SUGERIDO
+                            </span>
+                            <span className="font-mono text-xs sm:text-sm md:text-base font-black text-indigo-800 dark:text-indigo-200 truncate block mt-0.5">
                               {formatCurrency(product.preco_sugerido)}
                             </span>
                           </div>
-                          <div className="rounded-lg bg-emerald-50/70 p-1.5 border border-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-900/60 min-w-0">
-                            <span className="block text-[8px] sm:text-[9px] font-black text-emerald-700 dark:text-emerald-300 uppercase tracking-wider">MÍNIMO</span>
-                            <span className="font-mono text-[11px] sm:text-xs font-black text-emerald-700 dark:text-emerald-300 truncate block mt-0.5">
+                          <div className="rounded-xl bg-emerald-50 p-2 sm:p-2.5 border-2 border-emerald-300 dark:bg-emerald-950/60 dark:border-emerald-700 min-w-0 shadow-sm">
+                            <span className="block text-[10px] sm:text-[11px] font-black text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">
+                              MÍNIMO
+                            </span>
+                            <span className="font-mono text-xs sm:text-sm md:text-base font-black text-emerald-800 dark:text-emerald-200 truncate block mt-0.5">
                               {formatCurrency(product.preco_minimo)}
                             </span>
                           </div>

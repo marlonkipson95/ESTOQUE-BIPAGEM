@@ -260,14 +260,9 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
               <Barcode className="h-5 w-5" />
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-xs font-black text-indigo-600 dark:text-indigo-400">
-                  {currentProduct.codigo_atual}
-                </span>
-                <span className="rounded bg-slate-200 px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-700 dark:bg-slate-800 dark:text-slate-300">
-                  ID: {currentProduct.id}
-                </span>
-              </div>
+              <span className="font-mono text-xs font-black text-indigo-600 dark:text-indigo-400 block">
+                {currentProduct.codigo_fabrica ? `Cód. Fábrica: ${currentProduct.codigo_fabrica}` : currentProduct.codigo_atual}
+              </span>
               <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white truncate">
                 {currentProduct.descricao}
               </h2>

@@ -560,10 +560,6 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
                     </h2>
                   </div>
                 </div>
-
-                <span className="font-mono text-xs font-bold rounded-lg bg-slate-100 px-2.5 py-1 text-slate-700 dark:bg-slate-800 dark:text-slate-300 shrink-0">
-                  #{scanResult.product.id}
-                </span>
               </div>
 
               {/* CÓDIGO DE FÁBRICA EM DESTAQUE MÁXIMO PARA CONFERÊNCIA DA PEÇA */}
@@ -571,12 +567,9 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
                 <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-indigo-700 dark:text-indigo-300 block mb-1">
                   CÓDIGO ORIGINAL / FÁBRICA (CONFERÊNCIA DA PEÇA):
                 </span>
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-mono text-xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-wide break-all">
+                <div className="min-w-0">
+                  <span className="font-mono text-2xl sm:text-3xl font-black text-slate-900 dark:text-white tracking-wide break-all block">
                     {scanResult.product.codigo_fabrica || '—'}
-                  </span>
-                  <span className="rounded-lg bg-indigo-600 px-2.5 py-1 font-mono text-xs font-black text-white shrink-0">
-                    ID: {scanResult.product.id}
                   </span>
                 </div>
                 {scanResult.product.descricao && scanResult.product.descricao !== `PRODUTO ${scanResult.product.codigo_fabrica}` && (
@@ -646,31 +639,31 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
 
               {/* VALORES DE VENDA (TABELA, SUGERIDO, MÍNIMO) */}
               <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4 dark:border-slate-800 dark:bg-slate-900 shadow-sm">
-                <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-400 block mb-2">
+                <span className="text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-400 block mb-2">
                   Tabela de Preços de Venda
                 </span>
                 <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="rounded-xl bg-slate-50 p-2 border border-slate-200/70 dark:bg-slate-800/60 dark:border-slate-700/60 min-w-0">
-                    <span className="block text-[9px] sm:text-[10px] uppercase font-black tracking-wider text-slate-500 dark:text-slate-400">
+                  <div className="rounded-xl bg-slate-100/90 p-2.5 border-2 border-slate-300 dark:bg-slate-800 dark:border-slate-700 min-w-0 shadow-sm">
+                    <span className="block text-[10px] sm:text-[11px] uppercase font-black tracking-wider text-slate-600 dark:text-slate-400">
                       TABELA
                     </span>
-                    <span className="font-mono text-xs sm:text-base font-bold text-slate-900 dark:text-white truncate block mt-0.5">
+                    <span className="font-mono text-sm sm:text-lg font-black text-slate-900 dark:text-white truncate block mt-0.5">
                       {formatCurrency(scanResult.product.preco_tabela)}
                     </span>
                   </div>
-                  <div className="rounded-xl bg-indigo-50/70 p-2 border border-indigo-100 dark:bg-indigo-950/40 dark:border-indigo-900/60 min-w-0">
-                    <span className="block text-[9px] sm:text-[10px] uppercase font-black tracking-wider text-indigo-700 dark:text-indigo-300">
+                  <div className="rounded-xl bg-indigo-50 p-2.5 border-2 border-indigo-300 dark:bg-indigo-950/60 dark:border-indigo-700 min-w-0 shadow-sm">
+                    <span className="block text-[10px] sm:text-[11px] uppercase font-black tracking-wider text-indigo-700 dark:text-indigo-300">
                       SUGERIDO
                     </span>
-                    <span className="font-mono text-xs sm:text-base font-black text-indigo-700 dark:text-indigo-300 truncate block mt-0.5">
+                    <span className="font-mono text-sm sm:text-lg font-black text-indigo-800 dark:text-indigo-200 truncate block mt-0.5">
                       {formatCurrency(scanResult.product.preco_sugerido)}
                     </span>
                   </div>
-                  <div className="rounded-xl bg-emerald-50/70 p-2 border border-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-900/60 min-w-0">
-                    <span className="block text-[9px] sm:text-[10px] uppercase font-black tracking-wider text-emerald-700 dark:text-emerald-300">
+                  <div className="rounded-xl bg-emerald-50 p-2.5 border-2 border-emerald-300 dark:bg-emerald-950/60 dark:border-emerald-700 min-w-0 shadow-sm">
+                    <span className="block text-[10px] sm:text-[11px] uppercase font-black tracking-wider text-emerald-800 dark:text-emerald-300">
                       MÍNIMO
                     </span>
-                    <span className="font-mono text-xs sm:text-base font-black text-emerald-700 dark:text-emerald-300 truncate block mt-0.5">
+                    <span className="font-mono text-sm sm:text-lg font-black text-emerald-800 dark:text-emerald-200 truncate block mt-0.5">
                       {formatCurrency(scanResult.product.preco_minimo)}
                     </span>
                   </div>
@@ -705,40 +698,6 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
                   <strong className="font-mono text-xl text-emerald-700 dark:text-emerald-300 block">
                     {scanResult.product.quantidade} un
                   </strong>
-                </div>
-              </div>
-
-              {/* AJUSTE RÁPIDO DE ESTOQUE VIA BIPAGEM */}
-              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 dark:border-slate-800 dark:bg-slate-800/50 flex flex-wrap items-center justify-between gap-3">
-                <div className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                  <Boxes className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-                  <span>Ajuste Rápido de Estoque:</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickStockChange(-1)}
-                    disabled={isUpdating || (scanResult.product.quantidade || 0) <= 0}
-                    className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40 transition dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-                  >
-                    -1 Saída
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickStockChange(1)}
-                    disabled={isUpdating}
-                    className="rounded-lg bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white shadow hover:bg-emerald-500 disabled:opacity-40 transition"
-                  >
-                    +1 Entrada
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleQuickStockChange(5)}
-                    disabled={isUpdating}
-                    className="rounded-lg bg-indigo-600 px-3.5 py-1.5 text-xs font-bold text-white shadow hover:bg-indigo-500 disabled:opacity-40 transition"
-                  >
-                    +5 Entrada
-                  </button>
                 </div>
               </div>
 
