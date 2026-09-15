@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Package,
   CheckCircle2,
@@ -34,13 +34,43 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onApplyConsultaFilter,
   onSelectProduct,
 }) => {
-  // Calculations
-  const totalProducts = products.length;
-  const inStockProducts = products.filter(p => p.quantidade > 0);
-  const outOfStockProducts = products.filter(p => p.quantidade === 0);
-  const withoutLocation = products.filter(p => !p.corredor && !p.baia && !p.nivel && !p.locacao);
-  const withoutBarcode = products.filter(p => !p.codigo_barras_atual);
-  const lowStockProducts = products.filter(p => p.quantidade > 0 && p.quantidade <= (p.estoque_minimo || 5));
+  // Calculations otimizadas em loop único para suportar dezenas de milhares de itens
+  const {
+    totalProducts,
+    inStockProducts,
+    outOfStockProducts,
+    withoutLocation,
+    withoutBarcode,
+    lowStockProducts,
+  } = useMemo(() => {
+    const inStock: Product[] = [];
+    const outOfStock: Product[] = [];
+    const noLoc: Product[] = [];
+    const noBar: Product[] = [];
+    const lowStock: Product[] = [];
+
+    for (let i = 0; i < products.length; i++) {
+      const p = products[i];
+      const q = Number(p.quantidade) || 0;
+      if (q > 0) {
+        inStock.push(p);
+        if (q <= (p.estoque_minimo || 5)) lowStock.push(p);
+      } else {
+        outOfStock.push(p);
+      }
+      if (!p.corredor && !p.baia && !p.nivel && !p.locacao) noLoc.push(p);
+      if (!p.codigo_barras_atual) noBar.push(p);
+    }
+
+    return {
+      totalProducts: products.length,
+      inStockProducts: inStock,
+      outOfStockProducts: outOfStock,
+      withoutLocation: noLoc,
+      withoutBarcode: noBar,
+      lowStockProducts: lowStock,
+    };
+  }, [products]);
 
   // Recent updated codes (deactivated or changed in last 30 days)
   const recentlyUpdatedCodes = codeHistory.filter(h => !h.ativo || h.motivo?.includes('Substituído'));

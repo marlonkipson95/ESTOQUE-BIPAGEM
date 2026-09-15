@@ -20,6 +20,7 @@ import { storageService } from '../../services/storageService';
 import { apiService } from '../../services/apiService';
 import { beepService } from '../../services/beepService';
 import { parseScannedLabel } from '../../utils/barcodeParser';
+import { formatCurrency } from '../../utils/formatters';
 
 interface BipagemViewProps {
   onSelectProduct: (product: Product) => void;
@@ -649,19 +650,19 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
                   <div className="rounded-xl bg-slate-50 p-2 border border-slate-200/70 dark:bg-slate-800/60 dark:border-slate-700/60">
                     <span className="block text-[9px] uppercase font-bold text-slate-500 dark:text-slate-400">Preço Tabela</span>
                     <span className="font-mono text-sm sm:text-base font-bold text-slate-900 dark:text-white">
-                      {scanResult.product.preco_tabela ? `R$ ${scanResult.product.preco_tabela.toFixed(2)}` : '—'}
+                      {formatCurrency(scanResult.product.preco_tabela)}
                     </span>
                   </div>
                   <div className="rounded-xl bg-indigo-50/70 p-2 border border-indigo-100 dark:bg-indigo-950/40 dark:border-indigo-900/60">
                     <span className="block text-[9px] uppercase font-black text-indigo-700 dark:text-indigo-300">Preço Sugerido</span>
                     <span className="font-mono text-sm sm:text-base font-black text-indigo-700 dark:text-indigo-300">
-                      {scanResult.product.preco_sugerido ? `R$ ${scanResult.product.preco_sugerido.toFixed(2)}` : '—'}
+                      {formatCurrency(scanResult.product.preco_sugerido)}
                     </span>
                   </div>
                   <div className="rounded-xl bg-emerald-50/70 p-2 border border-emerald-100 dark:bg-emerald-950/40 dark:border-emerald-900/60">
                     <span className="block text-[9px] uppercase font-black text-emerald-700 dark:text-emerald-300">Preço Mínimo</span>
                     <span className="font-mono text-sm sm:text-base font-black text-emerald-700 dark:text-emerald-300">
-                      {scanResult.product.preco_minimo ? `R$ ${scanResult.product.preco_minimo.toFixed(2)}` : '—'}
+                      {formatCurrency(scanResult.product.preco_minimo)}
                     </span>
                   </div>
                 </div>

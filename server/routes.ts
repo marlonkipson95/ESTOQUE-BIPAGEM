@@ -209,7 +209,7 @@ apiRouter.post('/produtos/scan', async (req: Request, res: Response) => {
         `, [cleanCode, normalizedCode]);
 
         if (etapa1.rows.length > 0) {
-          const product = etapa1.rows[0];
+          const product = await loadProductExtras(client, etapa1.rows[0]);
           const isBarcode = product.codigo_barras_atual?.replace(/[\s\.-]/g, '').toUpperCase() === normalizedCode.toUpperCase();
           const isFactory = product.codigo_fabrica?.replace(/[\s\.-]/g, '').toUpperCase() === normalizedCode.toUpperCase();
           const activeCodeType = isBarcode ? 'codigo_barras' : (isFactory ? 'codigo_fabrica' : 'codigo_produto');
@@ -237,22 +237,8 @@ apiRouter.post('/produtos/scan', async (req: Request, res: Response) => {
 
         if (etapa2.rows.length > 0) {
           const row = etapa2.rows[0];
-          const product = {
-            id: row.produto_id,
-            codigo_atual: row.codigo_atual,
-            codigo_fabrica: row.codigo_fabrica,
-            codigo_barras_atual: row.codigo_barras_atual,
-            descricao: row.descricao,
-            custo_unitario: row.custo_unitario,
-            quantidade: row.quantidade,
-            estoque_minimo: row.estoque_minimo,
-            corredor: row.corredor,
-            baia: row.baia,
-            nivel: row.nivel,
-            locacao: row.locacao,
-            criado_em: row.criado_em,
-            atualizado_em: row.atualizado_em,
-          };
+          const fullP = await client.query('SELECT * FROM produtos WHERE id = $1', [row.produto_id]);
+          const product = fullP.rows.length > 0 ? await loadProductExtras(client, fullP.rows[0]) : row;
 
           return res.json({
             status: 'found_historical',
@@ -261,7 +247,11 @@ apiRouter.post('/produtos/scan', async (req: Request, res: Response) => {
             currentCode: product.codigo_atual,
             currentBarcode: product.codigo_barras_atual,
             historicalRecord: {
+              id: row.id,
+              produto_id: row.produto_id,
               tipo: row.tipo,
+              codigo: row.codigo,
+              ativo: row.ativo,
               desativado_em: row.desativado_em,
               motivo: row.motivo,
             },
@@ -277,7 +267,7 @@ apiRouter.post('/produtos/scan', async (req: Request, res: Response) => {
         `, [cleanCode]);
 
         if (etapa3.rows.length > 0) {
-          const product = etapa3.rows[0];
+          const product = await loadProductExtras(client, etapa3.rows[0]);
           return res.json({
             status: 'found_associated',
             product,
@@ -552,6 +542,8 @@ apiRouter.get('/produtos/:id', async (req: Request, res: Response) => {
           return res.status(404).json({ error: 'Produto não encontrado' });
         }
 
+        const product = await loadProductExtras(client, prodRes.rows[0]);
+
         const histRes = await client.query(`
           SELECT * FROM codigos_produto 
           WHERE produto_id = $1 
@@ -559,7 +551,7 @@ apiRouter.get('/produtos/:id', async (req: Request, res: Response) => {
         `, [id]);
 
         return res.json({
-          product: prodRes.rows[0],
+          product,
           history: histRes.rows,
         });
       } finally {

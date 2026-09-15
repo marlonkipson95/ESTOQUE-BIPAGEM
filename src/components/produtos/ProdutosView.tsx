@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Boxes,
   Plus,
@@ -10,6 +10,8 @@ import {
   AlertTriangle,
   ArrowUpDown,
   Filter,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { Product, ProductCodeHistory } from '../../types';
 import { LocationBadge } from '../common/LocationBadge';
@@ -30,6 +32,20 @@ export const ProdutosView: React.FC<ProdutosViewProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState<'descricao' | 'codigo' | 'quantidade' | 'locacao'>('descricao');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 50;
+
+  // Mapa otimizado O(1) de histórico para não travar a listagem de milhares de itens
+  const historyCountMap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (let i = 0; i < codeHistory.length; i++) {
+      const h = codeHistory[i];
+      if (!h.ativo && h.produto_id) {
+        map.set(h.produto_id, (map.get(h.produto_id) || 0) + 1);
+      }
+    }
+    return map;
+  }, [codeHistory]);
 
   const filteredAndSorted = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
@@ -37,8 +53,8 @@ export const ProdutosView: React.FC<ProdutosViewProps> = ({
     const filtered = products.filter(p => {
       if (!term) return true;
       return (
-        p.descricao.toLowerCase().includes(term) ||
-        p.codigo_atual.toLowerCase().includes(term) ||
+        (p.descricao && p.descricao.toLowerCase().includes(term)) ||
+        (p.codigo_atual && p.codigo_atual.toLowerCase().includes(term)) ||
         (p.codigo_fabrica && p.codigo_fabrica.toLowerCase().includes(term)) ||
         (p.codigo_barras_atual && p.codigo_barras_atual.toLowerCase().includes(term)) ||
         (p.locacao && p.locacao.toLowerCase().includes(term))
@@ -48,11 +64,11 @@ export const ProdutosView: React.FC<ProdutosViewProps> = ({
     return filtered.sort((a, b) => {
       let comparison = 0;
       if (sortBy === 'descricao') {
-        comparison = a.descricao.localeCompare(b.descricao);
+        comparison = (a.descricao || '').localeCompare(b.descricao || '');
       } else if (sortBy === 'codigo') {
-        comparison = a.codigo_atual.localeCompare(b.codigo_atual);
+        comparison = (a.codigo_atual || '').localeCompare(b.codigo_atual || '');
       } else if (sortBy === 'quantidade') {
-        comparison = a.quantidade - b.quantidade;
+        comparison = (Number(a.quantidade) || 0) - (Number(b.quantidade) || 0);
       } else if (sortBy === 'locacao') {
         comparison = (a.locacao || '').localeCompare(b.locacao || '');
       }
@@ -60,6 +76,18 @@ export const ProdutosView: React.FC<ProdutosViewProps> = ({
       return sortOrder === 'asc' ? comparison : -comparison;
     });
   }, [products, searchTerm, sortBy, sortOrder]);
+
+  // Reset de página ao buscar ou reordenar
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, sortBy, sortOrder]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredAndSorted.length / itemsPerPage));
+
+  const paginatedProducts = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredAndSorted.slice(start, start + itemsPerPage);
+  }, [filteredAndSorted, currentPage, itemsPerPage]);
 
   const toggleSort = (field: 'descricao' | 'codigo' | 'quantidade' | 'locacao') => {
     if (sortBy === field) {
@@ -161,8 +189,8 @@ export const ProdutosView: React.FC<ProdutosViewProps> = ({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-              {filteredAndSorted.map(product => {
-                const historyCount = codeHistory.filter(h => h.produto_id === product.id && !h.ativo).length;
+              {paginatedProducts.map(product => {
+                const historyCount = historyCountMap.get(product.id) || 0;
 
                 return (
                   <tr
@@ -232,7 +260,7 @@ export const ProdutosView: React.FC<ProdutosViewProps> = ({
 
         {/* Mobile Cards View */}
         <div className="lg:hidden divide-y divide-slate-100 dark:divide-slate-800">
-          {filteredAndSorted.map(product => (
+          {paginatedProducts.map(product => (
             <div
               key={product.id}
               onClick={() => onSelectProduct(product)}
@@ -271,6 +299,36 @@ export const ProdutosView: React.FC<ProdutosViewProps> = ({
             </div>
           ))}
         </div>
+
+        {/* Controles de Paginação */}
+        {totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/30">
+            <span className="text-xs text-slate-500 dark:text-slate-400">
+              Página <strong className="text-slate-900 dark:text-white">{currentPage}</strong> de <strong>{totalPages}</strong> ({filteredAndSorted.length} produtos)
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={currentPage <= 1}
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" />
+                <span>Anterior</span>
+              </button>
+
+              <button
+                type="button"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                className="inline-flex items-center gap-1 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition"
+              >
+                <span>Próxima</span>
+                <ChevronRight className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

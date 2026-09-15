@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Search,
   Filter,
@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Product, ProductCodeHistory, ConsultaFilters } from '../../types';
 import { LocationBadge } from '../common/LocationBadge';
+import { formatCurrency } from '../../utils/formatters';
 
 interface ConsultaViewProps {
   products: Product[];
@@ -35,6 +36,11 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
   onOpenQuickScan,
 }) => {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [displayLimit, setDisplayLimit] = useState(48);
+
+  useEffect(() => {
+    setDisplayLimit(48);
+  }, [filters]);
 
   // Available unique locations for filter selects
   const uniqueCorredores = useMemo(() => {
@@ -108,6 +114,11 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
       return true;
     });
   }, [products, codeHistory, filters]);
+
+  // Produtos fatiados para renderização progressiva leve e rápida
+  const visibleProducts = useMemo(() => {
+    return filteredProducts.slice(0, displayLimit);
+  }, [filteredProducts, displayLimit]);
 
   // Active filters count and list for badges
   const activeFilterPills = useMemo(() => {
@@ -391,118 +402,136 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {filteredProducts.map(product => {
-              const isOutOfStock = product.quantidade <= 0;
-              const isLowStock = !isOutOfStock && product.quantidade <= (product.estoque_minimo || 5);
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {visibleProducts.map(product => {
+                const isOutOfStock = product.quantidade <= 0;
+                const isLowStock = !isOutOfStock && product.quantidade <= (product.estoque_minimo || 5);
 
-              return (
-                <div
-                  key={product.id}
-                  className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-indigo-400 hover:shadow-md transition dark:border-slate-800 dark:bg-slate-900"
-                >
-                  {/* Top: Description and Stock Badge */}
-                  <div>
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400">
-                        {product.codigo_atual}
-                      </span>
-                      <span
-                        className={`rounded-full px-2.5 py-0.5 text-xs font-black tracking-wide uppercase ${
-                          isOutOfStock
-                            ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300'
-                            : isLowStock
-                            ? 'bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-300'
-                            : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300'
-                        }`}
+                return (
+                  <div
+                    key={product.id}
+                    className="flex flex-col justify-between rounded-2xl border border-slate-200 bg-white p-5 shadow-sm hover:border-indigo-400 hover:shadow-md transition dark:border-slate-800 dark:bg-slate-900"
+                  >
+                    {/* Top: Description and Stock Badge */}
+                    <div>
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400">
+                          {product.codigo_atual}
+                        </span>
+                        <span
+                          className={`rounded-full px-2.5 py-0.5 text-xs font-black tracking-wide uppercase ${
+                            isOutOfStock
+                              ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300'
+                              : isLowStock
+                              ? 'bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-300'
+                              : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300'
+                          }`}
+                        >
+                          {isOutOfStock ? 'Sem estoque' : `${product.quantidade} un`}
+                        </span>
+                      </div>
+
+                      <h3 className="mt-2 text-base font-bold text-slate-900 dark:text-white line-clamp-2 leading-snug">
+                        {product.descricao}
+                      </h3>
+
+                      {/* Destaque do Código de Fábrica */}
+                      <div className="mt-3 rounded-xl bg-indigo-50/70 p-2.5 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-between">
+                        <span className="text-[11px] font-black uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
+                          Cód. Fábrica:
+                        </span>
+                        <strong className="font-mono text-base sm:text-lg font-black text-slate-900 dark:text-white">
+                          {product.codigo_fabrica || '—'}
+                        </strong>
+                      </div>
+
+                      {/* Localização Física em Destaque Especial */}
+                      <div className="mt-3">
+                        <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-1">
+                          <MapPin className="h-3.5 w-3.5 text-amber-500" />
+                          <span>Localização no Estoque</span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-1.5 text-center bg-slate-900 text-white rounded-xl p-2.5 border border-slate-800 shadow-sm">
+                          <div className="rounded-lg bg-slate-800/80 py-1">
+                            <span className="block text-[9px] uppercase font-bold text-amber-300">Corredor</span>
+                            <span className="font-mono text-base sm:text-xl font-black text-amber-400">
+                              {product.corredor || '—'}
+                            </span>
+                          </div>
+                          <div className="rounded-lg bg-slate-800/80 py-1">
+                            <span className="block text-[9px] uppercase font-bold text-emerald-300">Baia</span>
+                            <span className="font-mono text-base sm:text-xl font-black text-emerald-400">
+                              {product.baia || '—'}
+                            </span>
+                          </div>
+                          <div className="rounded-lg bg-slate-800/80 py-1">
+                            <span className="block text-[9px] uppercase font-bold text-sky-300">Nível</span>
+                            <span className="font-mono text-base sm:text-xl font-black text-sky-400">
+                              {product.nivel || '—'}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Preços de Venda (Tabela, Sugerido, Mínimo) */}
+                      <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800">
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                          Valores de Venda
+                        </span>
+                        <div className="grid grid-cols-3 gap-1.5 text-center">
+                          <div className="rounded-lg bg-slate-50 p-1.5 border border-slate-200/70 dark:bg-slate-800/50 dark:border-slate-700/60">
+                            <span className="block text-[9px] font-semibold text-slate-500 dark:text-slate-400 uppercase">Tabela</span>
+                            <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">
+                              {formatCurrency(product.preco_tabela)}
+                            </span>
+                          </div>
+                          <div className="rounded-lg bg-indigo-50/70 p-1.5 border border-indigo-100 dark:bg-indigo-950/30 dark:border-indigo-900/60">
+                            <span className="block text-[9px] font-bold text-indigo-700 dark:text-indigo-300 uppercase">Sugerido</span>
+                            <span className="font-mono text-xs font-black text-indigo-700 dark:text-indigo-300">
+                              {formatCurrency(product.preco_sugerido)}
+                            </span>
+                          </div>
+                          <div className="rounded-lg bg-emerald-50/70 p-1.5 border border-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-900/60">
+                            <span className="block text-[9px] font-bold text-emerald-700 dark:text-emerald-300 uppercase">Mínimo</span>
+                            <span className="font-mono text-xs font-black text-emerald-700 dark:text-emerald-300">
+                              {formatCurrency(product.preco_minimo)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Footer Action */}
+                    <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800">
+                      <button
+                        onClick={() => onSelectProduct(product)}
+                        className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 py-2.5 text-xs font-bold text-white hover:bg-slate-800 dark:bg-indigo-600 dark:hover:bg-indigo-500 transition shadow-sm"
                       >
-                        {isOutOfStock ? 'Sem estoque' : `${product.quantidade} un`}
-                      </span>
-                    </div>
-
-                    <h3 className="mt-2 text-base font-bold text-slate-900 dark:text-white line-clamp-2 leading-snug">
-                      {product.descricao}
-                    </h3>
-
-                    {/* Destaque do Código de Fábrica */}
-                    <div className="mt-3 rounded-xl bg-indigo-50/70 p-2.5 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-900/60 flex items-center justify-between">
-                      <span className="text-[11px] font-black uppercase tracking-wider text-indigo-700 dark:text-indigo-300">
-                        Cód. Fábrica:
-                      </span>
-                      <strong className="font-mono text-base sm:text-lg font-black text-slate-900 dark:text-white">
-                        {product.codigo_fabrica || '—'}
-                      </strong>
-                    </div>
-
-                    {/* Localização Física em Destaque Especial */}
-                    <div className="mt-3">
-                      <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-1">
-                        <MapPin className="h-3.5 w-3.5 text-amber-500" />
-                        <span>Localização no Estoque</span>
-                      </div>
-                      <div className="grid grid-cols-3 gap-1.5 text-center bg-slate-900 text-white rounded-xl p-2.5 border border-slate-800 shadow-sm">
-                        <div className="rounded-lg bg-slate-800/80 py-1">
-                          <span className="block text-[9px] uppercase font-bold text-amber-300">Corredor</span>
-                          <span className="font-mono text-base sm:text-xl font-black text-amber-400">
-                            {product.corredor || '—'}
-                          </span>
-                        </div>
-                        <div className="rounded-lg bg-slate-800/80 py-1">
-                          <span className="block text-[9px] uppercase font-bold text-emerald-300">Baia</span>
-                          <span className="font-mono text-base sm:text-xl font-black text-emerald-400">
-                            {product.baia || '—'}
-                          </span>
-                        </div>
-                        <div className="rounded-lg bg-slate-800/80 py-1">
-                          <span className="block text-[9px] uppercase font-bold text-sky-300">Nível</span>
-                          <span className="font-mono text-base sm:text-xl font-black text-sky-400">
-                            {product.nivel || '—'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Preços de Venda (Tabela, Sugerido, Mínimo) */}
-                    <div className="mt-3 pt-2.5 border-t border-slate-100 dark:border-slate-800">
-                      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
-                        Valores de Venda
-                      </span>
-                      <div className="grid grid-cols-3 gap-1.5 text-center">
-                        <div className="rounded-lg bg-slate-50 p-1.5 border border-slate-200/70 dark:bg-slate-800/50 dark:border-slate-700/60">
-                          <span className="block text-[9px] font-semibold text-slate-500 dark:text-slate-400 uppercase">Tabela</span>
-                          <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">
-                            {product.preco_tabela ? `R$ ${product.preco_tabela.toFixed(2)}` : '—'}
-                          </span>
-                        </div>
-                        <div className="rounded-lg bg-indigo-50/70 p-1.5 border border-indigo-100 dark:bg-indigo-950/30 dark:border-indigo-900/60">
-                          <span className="block text-[9px] font-bold text-indigo-700 dark:text-indigo-300 uppercase">Sugerido</span>
-                          <span className="font-mono text-xs font-black text-indigo-700 dark:text-indigo-300">
-                            {product.preco_sugerido ? `R$ ${product.preco_sugerido.toFixed(2)}` : '—'}
-                          </span>
-                        </div>
-                        <div className="rounded-lg bg-emerald-50/70 p-1.5 border border-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-900/60">
-                          <span className="block text-[9px] font-bold text-emerald-700 dark:text-emerald-300 uppercase">Mínimo</span>
-                          <span className="font-mono text-xs font-black text-emerald-700 dark:text-emerald-300">
-                            {product.preco_minimo ? `R$ ${product.preco_minimo.toFixed(2)}` : '—'}
-                          </span>
-                        </div>
-                      </div>
+                        <span>VER PRODUTO</span>
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   </div>
+                );
+              })}
+            </div>
 
-                  {/* Footer Action */}
-                  <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800">
-                    <button
-                      onClick={() => onSelectProduct(product)}
-                      className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 py-2.5 text-xs font-bold text-white hover:bg-slate-800 dark:bg-indigo-600 dark:hover:bg-indigo-500 transition shadow-sm"
-                    >
-                      <span>VER PRODUTO</span>
-                      <ExternalLink className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+            {/* BOTÃO CARREGAR MAIS (PROGRESSIVO PARA ALTO DESEMPENHO) */}
+            {filteredProducts.length > displayLimit && (
+              <div className="pt-4 pb-8 flex flex-col items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setDisplayLimit(prev => prev + 48)}
+                  className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-xs md:text-sm font-bold text-white shadow-md hover:bg-indigo-500 transition active:scale-95"
+                >
+                  <span>Carregar mais mercadorias (+48)</span>
+                </button>
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  Exibindo {visibleProducts.length} de {filteredProducts.length} produtos encontrados
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>
