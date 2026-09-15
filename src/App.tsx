@@ -10,6 +10,7 @@ import {
 } from './types';
 import { storageService } from './services/storageService';
 import { authService } from './services/authService';
+import { apiService } from './services/apiService';
 import { useBarcodeScanner } from './hooks/useBarcodeScanner';
 import { Sidebar } from './components/common/Sidebar';
 import { Header } from './components/common/Header';
