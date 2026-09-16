@@ -18,8 +18,8 @@ export default defineConfig(() => {
         includeAssets: ['icon.svg', 'apple-touch-icon.png', 'pwa-192x192.png', 'pwa-512x512.png'],
         manifest: {
           id: '/',
-          name: 'Kipson Estoque',
-          short_name: 'Kipson',
+          name: 'KipStock • Gestão & Bipagem Inteligente',
+          short_name: 'KipStock',
           description: 'Sistema PWA para identificação, localização física, bipagem e recebimento de mercadorias em estoque.',
           theme_color: '#1e293b',
           background_color: '#0f172a',

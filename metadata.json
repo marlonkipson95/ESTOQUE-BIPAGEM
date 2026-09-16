@@ -1,5 +1,5 @@
 {
-  "name": "Kipson Estoque",
+  "name": "KipStock • Gestão & Bipagem Inteligente",
   "description": "Sistema PWA para identificação, localização física, bipagem e recebimento de mercadorias em estoque.",
   "requestFramePermissions": ["camera"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]

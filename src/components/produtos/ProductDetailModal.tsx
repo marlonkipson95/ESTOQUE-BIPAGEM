@@ -989,7 +989,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
             </div>
 
             <div className="rounded-lg bg-amber-50 p-2.5 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-300 mb-4">
-              <strong>Regra KIPSON:</strong> O código antigo nunca será apagado. Ele permanecerá vinculado a este produto no histórico para que qualquer bipagem futura continue localizando este mesmo item.
+              <strong>Regra KIPSTOCK:</strong> O código antigo nunca será apagado. Ele permanecerá vinculado a este produto no histórico para que qualquer bipagem futura continue localizando este mesmo item.
             </div>
 
             <div className="space-y-3 text-xs">

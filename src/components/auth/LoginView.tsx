@@ -75,10 +75,10 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
             <Boxes className="h-9 w-9" />
           </div>
           <h1 className="text-2xl md:text-3xl font-black tracking-tight text-white">
-            KIPSON ESTOQUE
+            KIPSTOCK
           </h1>
           <p className="text-xs md:text-sm text-slate-400 mt-1">
-            Sistema Integrado de Armazém & Rastreamento
+            Gestão & Bipagem Inteligente
           </p>
         </div>
 
@@ -179,7 +179,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
 
         {/* Footer */}
         <p className="mt-6 text-center text-xs text-slate-500">
-          Kipson Estoque • Versão 2.4 com Rastreamento Permanente de Bipagem
+          KipStock • Gestão & Bipagem Inteligente
         </p>
       </div>
     </div>

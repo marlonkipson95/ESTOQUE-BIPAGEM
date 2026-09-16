@@ -58,10 +58,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
         <div>
           <h1 className="font-black tracking-tight text-white text-lg leading-tight">
-            KIPSON
+            KIPSTOCK
           </h1>
-          <span className="text-[11px] font-bold uppercase tracking-widest text-indigo-400">
-            Estoque & Locação
+          <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-400">
+            Gestão & Bipagem
           </span>
         </div>
       </div>

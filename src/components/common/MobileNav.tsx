@@ -101,8 +101,8 @@ export const MobileNav: React.FC<MobileNavProps> = ({
                   <Barcode className="h-5 w-5" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-base">KIPSON</h3>
-                  <p className="text-[10px] uppercase tracking-wider text-indigo-400">Estoque PWA</p>
+                  <h3 className="font-bold text-base">KIPSTOCK</h3>
+                  <p className="text-[10px] uppercase tracking-wider text-indigo-400">Gestão & Bipagem</p>
                 </div>
               </div>
               <button

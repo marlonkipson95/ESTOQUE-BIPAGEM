@@ -48,7 +48,7 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const isOnline = useOnlineStatus();
   const { isInstallable, install } = usePWAInstall();
-  const info = MODULE_NAMES[activeModule] || { title: 'Kipson', subtitle: '' };
+  const info = MODULE_NAMES[activeModule] || { title: 'KipStock', subtitle: '' };
   const [dbStatus, setDbStatus] = useState<'connected' | 'checking' | 'disconnected'>('checking');
 
   useEffect(() => {

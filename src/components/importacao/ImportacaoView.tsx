@@ -549,7 +549,7 @@ PRD-0001;CHAVE COMBINADA 13MM BELZER CR-V;504.02.1;7899999000111;50;03;B12;04;03
           <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 dark:border-amber-800/40 dark:bg-amber-950/20 space-y-3 text-xs">
             <div className="flex items-center gap-2 font-bold text-amber-900 dark:text-amber-200">
               <Shield className="h-4 w-4 text-amber-600" />
-              <span>Regras de Proteção de Dados (Mandatórios KIPSON)</span>
+              <span>Regras de Proteção de Dados (Mandatórios KIPSTOCK)</span>
             </div>
 
             <label className="flex items-center gap-2 cursor-pointer text-slate-800 dark:text-slate-200">

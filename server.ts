@@ -61,7 +61,7 @@ async function startServer() {
 
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`===========================================`);
-    console.log(`  KIPSON ESTOQUE - Backend Server Ativo    `);
+    console.log(`  KIPSTOCK - Backend Server Ativo         `);
     console.log(`  Porta: http://0.0.0.0:${PORT}           `);
     console.log(`  API:   http://0.0.0.0:${PORT}/api/health`);
     console.log(`===========================================`);

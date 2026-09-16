@@ -15,7 +15,7 @@ export const PWAInstallBanner: React.FC = () => {
         <div className="flex items-center gap-2">
           <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
           <span className="font-medium">
-            Instale o <strong>Kipson Estoque</strong> no seu dispositivo para acesso offline e scanner ultra-rápido.
+            Instale o <strong>KipStock</strong> no seu dispositivo para acesso offline e scanner ultra-rápido.
           </span>
         </div>
         <div className="flex items-center gap-2">

@@ -32,7 +32,7 @@
   <!-- Warehouse Location Box / Rack symbol -->
   <g transform="translate(156, 310)">
     <rect x="0" y="0" width="200" height="90" rx="16" fill="url(#accentGrad)"/>
-    <text x="100" y="42" fill="#ffffff" font-family="system-ui, sans-serif" font-weight="900" font-size="28" text-anchor="middle" letter-spacing="2">KIPSON</text>
+    <text x="100" y="42" fill="#ffffff" font-family="system-ui, sans-serif" font-weight="900" font-size="24" text-anchor="middle" letter-spacing="1.5">KIPSTOCK</text>
     <text x="100" y="72" fill="#fde047" font-family="system-ui, sans-serif" font-weight="700" font-size="18" text-anchor="middle" letter-spacing="3">ESTOQUE</text>
   </g>
 </svg>

@@ -42,7 +42,7 @@ export const INITIAL_PROFILES: ImportProfile[] = [
 ];
 
 export const DEFAULT_SETTINGS: SystemSettings = {
-  nomeSistema: 'KIPSON ESTOQUE',
+  nomeSistema: 'KipStock • Gestão & Bipagem Inteligente',
   tema: 'light',
   beepSom: true,
   vibracao: true,

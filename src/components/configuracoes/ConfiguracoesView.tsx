@@ -112,7 +112,7 @@ export const ConfiguracoesView: React.FC<ConfiguracoesViewProps> = ({ onDatabase
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `kipson_estoque_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `kipstock_backup_${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
     beepService.playSuccess();
