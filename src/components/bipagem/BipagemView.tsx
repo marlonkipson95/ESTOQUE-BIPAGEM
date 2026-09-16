@@ -25,6 +25,7 @@ import { beepService } from '../../services/beepService';
 import { parseScannedLabel } from '../../utils/barcodeParser';
 import { formatCurrency } from '../../utils/formatters';
 import { GenericProductsModal } from '../common/GenericProductsModal';
+import { AdaptivePrice } from '../common/AdaptivePrice';
 
 interface BipagemViewProps {
   onSelectProduct: (product: Product) => void;
@@ -72,6 +73,8 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
   const [isEditDataModalOpen, setIsEditDataModalOpen] = useState(false);
   const [editDescricao, setEditDescricao] = useState('');
   const [editCodigoFabrica, setEditCodigoFabrica] = useState('');
+  const [editCodigoBarras, setEditCodigoBarras] = useState('');
+  const [editScannedSourceCode, setEditScannedSourceCode] = useState('');
   const [isSavingDescricao, setIsSavingDescricao] = useState(false);
   const [editDataSuccessMsg, setEditDataSuccessMsg] = useState('');
 
@@ -82,8 +85,37 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
 
   const handleOpenEditData = (initialDesc?: string) => {
     if (!scanResult?.product) return;
-    setEditDescricao(initialDesc !== undefined ? initialDesc : (scanResult.product.descricao || ''));
-    setEditCodigoFabrica(scanResult.product.codigo_fabrica || '');
+    const p = scanResult.product;
+    const scanned = (scanResult.code || '').trim();
+    setEditScannedSourceCode(scanned);
+
+    // Identifica se o bipe é um código de barras numérico (7 a 14 dígitos) ou alfanumérico de fábrica
+    const isBarcodeLike = /^\d{7,14}$/.test(scanned.replace(/[\s\.-]/g, ''));
+
+    // Descrição: se não tiver ou for padrão, tenta sugerir do parser da etiqueta
+    const parsed = parseScannedLabel(scanned);
+    const suggestedDesc = parsed.descricao_sugerida || (parsed.fabricante ? `PEÇA ${parsed.fabricante}` : '');
+
+    let descToUse = initialDesc !== undefined ? initialDesc : (p.descricao || '');
+    if (!descToUse || descToUse.startsWith('PRODUTO ') || descToUse === 'MERCADORIA EM ESTOQUE') {
+      descToUse = suggestedDesc || '';
+    }
+    setEditDescricao(descToUse);
+
+    // Código de Barras: Se o bipe for código de barras numérico, já puxa do bipe!
+    let barcodeToUse = p.codigo_barras_atual || '';
+    if (isBarcodeLike && scanned && scanned !== p.codigo_barras_atual) {
+      barcodeToUse = scanned;
+    }
+    setEditCodigoBarras(barcodeToUse);
+
+    // Código de Fábrica: Se o bipe for alfanumérico / part number, já puxa do bipe!
+    let factoryToUse = p.codigo_fabrica || '';
+    if (!isBarcodeLike && scanned && scanned !== p.codigo_fabrica) {
+      factoryToUse = scanned;
+    }
+    setEditCodigoFabrica(factoryToUse);
+
     setEditDataSuccessMsg('');
     setIsEditDataModalOpen(true);
   };
@@ -94,18 +126,33 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
     const cleanDesc = editDescricao.trim();
     if (!cleanDesc) return;
     const cleanFab = editCodigoFabrica.trim();
+    const cleanBar = editCodigoBarras.trim();
 
     setIsSavingDescricao(true);
     try {
       const updatedFields: any = {
         ...scanResult.product,
         descricao: cleanDesc,
+        codigo_fabrica: cleanFab,
       };
-      if (cleanFab) {
-        updatedFields.codigo_fabrica = cleanFab;
+
+      if (cleanBar) {
+        updatedFields.codigo_barras_atual = cleanBar;
       }
 
       await apiService.updateProduct(scanResult.product.id, updatedFields);
+
+      // Se o código de barras foi preenchido ou alterado, associa no histórico também
+      if (cleanBar && cleanBar !== scanResult.product.codigo_barras_atual) {
+        try {
+          await apiService.updateProductCode(
+            scanResult.product.id,
+            'codigo_barras',
+            cleanBar,
+            'Código de barras atualizado a partir do bipe'
+          );
+        } catch {}
+      }
 
       storageService.updateProduct({
         ...updatedFields,
@@ -121,7 +168,7 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
       });
 
       beepService.playSuccess();
-      setEditDataSuccessMsg('Dados atualizados com sucesso!');
+      setEditDataSuccessMsg('Dados atualizados com sucesso de acordo com a bipagem!');
       setTimeout(() => {
         setEditDataSuccessMsg('');
         setIsEditDataModalOpen(false);
@@ -784,35 +831,29 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
                 </div>
               </div>
 
-              {/* VALORES DE VENDA (TABELA, SUGERIDO, MÍNIMO) - FONTE AUMENTADA E PREÇO DE VENDA (R$) */}
+              {/* VALORES DE VENDA (TABELA, SUGERIDO, MÍNIMO) - TIPOGRAFIA ADAPTATIVA COM CASAS DECIMAIS GARANTIDAS */}
               <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-3.5 sm:p-4 dark:border-slate-800 dark:bg-slate-900 shadow-sm">
                 <span className="text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-400 block mb-2">
                   Preço de Venda (R$)
                 </span>
                 <div className="grid grid-cols-3 gap-2 text-center">
-                  <div className="rounded-xl bg-slate-100/90 p-2.5 sm:p-3 border-2 border-slate-300 dark:bg-slate-800 dark:border-slate-700 min-w-0 shadow-sm">
-                    <span className="block text-[10px] sm:text-xs uppercase font-black tracking-wider text-slate-600 dark:text-slate-400">
+                  <div className="rounded-xl bg-slate-100/90 p-2 sm:p-3 border-2 border-slate-300 dark:bg-slate-800 dark:border-slate-700 min-w-0 shadow-sm flex flex-col justify-center">
+                    <span className="block text-[10px] sm:text-xs uppercase font-black tracking-wider text-slate-600 dark:text-slate-400 mb-1">
                       TABELA
                     </span>
-                    <span className="font-mono text-xl sm:text-2xl md:text-3xl font-black text-slate-900 dark:text-white truncate block mt-0.5">
-                      {formatPriceOnlyNumber(scanResult.product.preco_tabela)}
-                    </span>
+                    <AdaptivePrice value={scanResult.product.preco_tabela} />
                   </div>
-                  <div className="rounded-xl bg-indigo-50 p-2.5 sm:p-3 border-2 border-indigo-300 dark:bg-indigo-950/60 dark:border-indigo-700 min-w-0 shadow-sm">
-                    <span className="block text-[10px] sm:text-xs uppercase font-black tracking-wider text-indigo-700 dark:text-indigo-300">
+                  <div className="rounded-xl bg-indigo-50 p-2 sm:p-3 border-2 border-indigo-300 dark:bg-indigo-950/60 dark:border-indigo-700 min-w-0 shadow-sm flex flex-col justify-center">
+                    <span className="block text-[10px] sm:text-xs uppercase font-black tracking-wider text-indigo-700 dark:text-indigo-300 mb-1">
                       SUGERIDO
                     </span>
-                    <span className="font-mono text-xl sm:text-2xl md:text-3xl font-black text-indigo-800 dark:text-indigo-200 truncate block mt-0.5">
-                      {formatPriceOnlyNumber(scanResult.product.preco_sugerido)}
-                    </span>
+                    <AdaptivePrice value={scanResult.product.preco_sugerido} colorClass="text-indigo-800 dark:text-indigo-200" />
                   </div>
-                  <div className="rounded-xl bg-emerald-50 p-2.5 sm:p-3 border-2 border-emerald-300 dark:bg-emerald-950/60 dark:border-emerald-700 min-w-0 shadow-sm">
-                    <span className="block text-[10px] sm:text-xs uppercase font-black tracking-wider text-emerald-800 dark:text-emerald-300">
+                  <div className="rounded-xl bg-emerald-50 p-2 sm:p-3 border-2 border-emerald-300 dark:bg-emerald-950/60 dark:border-emerald-700 min-w-0 shadow-sm flex flex-col justify-center">
+                    <span className="block text-[10px] sm:text-xs uppercase font-black tracking-wider text-emerald-800 dark:text-emerald-300 mb-1">
                       MÍNIMO
                     </span>
-                    <span className="font-mono text-xl sm:text-2xl md:text-3xl font-black text-emerald-800 dark:text-emerald-200 truncate block mt-0.5">
-                      {formatPriceOnlyNumber(scanResult.product.preco_minimo)}
-                    </span>
+                    <AdaptivePrice value={scanResult.product.preco_minimo} colorClass="text-emerald-800 dark:text-emerald-300" />
                   </div>
                 </div>
               </div>
@@ -967,17 +1008,19 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
           {/* ============================================================ */}
           {scanResult.status === 'not_found' && (
             <div className="rounded-2xl border-2 border-amber-400 bg-white p-6 shadow-xl dark:bg-slate-900 dark:border-amber-500/80">
-              <div className="flex items-center gap-3 border-b border-slate-200 pb-4 dark:border-slate-800">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                  <PlusCircle className="h-6 w-6" />
-                </div>
-                <div>
-                  <span className="text-xs font-black uppercase tracking-wider text-amber-700 dark:text-amber-400">
-                    Mercadoria Não Cadastrada no Sistema
-                  </span>
-                  <h2 className="text-lg md:text-xl font-black text-slate-900 dark:text-white">
-                    CADASTRAR E DEFINIR LOCAÇÃO
-                  </h2>
+              <div className="flex items-center justify-between gap-3 border-b border-slate-200 pb-4 dark:border-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                    <AlertTriangle className="h-6 w-6 text-amber-600" />
+                  </div>
+                  <div>
+                    <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-[10px] sm:text-xs font-black uppercase tracking-wider text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
+                      CÓDIGO NÃO LOCALIZADO NO ESTOQUE
+                    </span>
+                    <h2 className="text-lg md:text-xl font-black text-slate-900 dark:text-white mt-0.5">
+                      NOVA MERCADORIA: DEFINIR LOCAÇÃO
+                    </h2>
+                  </div>
                 </div>
               </div>
 
@@ -1215,10 +1258,53 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
             </div>
 
             <form onSubmit={handleSaveProductData} className="space-y-4">
+              {/* Identificação de Origem da Bipagem */}
+              <div className="rounded-xl bg-indigo-50 dark:bg-indigo-950/50 p-2.5 border border-indigo-200 dark:border-indigo-800 text-xs text-indigo-900 dark:text-indigo-200 flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                <span className="leading-tight">
+                  Código da bipagem atual: <strong className="font-mono text-indigo-700 dark:text-indigo-300 font-black">{editScannedSourceCode || scanResult?.code}</strong> (campos pré-carregados automaticamente abaixo)
+                </span>
+              </div>
+
               <div>
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                  Código de Fábrica / Part Number:
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Código de Barras (EAN):
+                  </label>
+                  {(editScannedSourceCode || scanResult?.code) && editCodigoBarras !== (editScannedSourceCode || scanResult?.code) && (
+                    <button
+                      type="button"
+                      onClick={() => setEditCodigoBarras(editScannedSourceCode || scanResult?.code || '')}
+                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-200 underline cursor-pointer"
+                    >
+                      ⚡ Usar código do bipe ({editScannedSourceCode || scanResult?.code})
+                    </button>
+                  )}
+                </div>
+                <input
+                  type="text"
+                  value={editCodigoBarras}
+                  onChange={e => setEditCodigoBarras(e.target.value)}
+                  placeholder="Ex: 7891234567890"
+                  className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-2.5 font-mono text-xs font-bold text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                    Código de Fábrica / Part Number:
+                  </label>
+                  {(editScannedSourceCode || scanResult?.code) && editCodigoFabrica !== (editScannedSourceCode || scanResult?.code) && (
+                    <button
+                      type="button"
+                      onClick={() => setEditCodigoFabrica(editScannedSourceCode || scanResult?.code || '')}
+                      className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-200 underline cursor-pointer"
+                    >
+                      ⚡ Usar código do bipe ({editScannedSourceCode || scanResult?.code})
+                    </button>
+                  )}
+                </div>
                 <input
                   type="text"
                   value={editCodigoFabrica}

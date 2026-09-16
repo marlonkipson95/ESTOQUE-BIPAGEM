@@ -17,6 +17,7 @@ import { Product, ProductCodeHistory, ConsultaFilters } from '../../types';
 import { LocationBadge } from '../common/LocationBadge';
 import { formatCurrency } from '../../utils/formatters';
 import { GenericProductsModal } from '../common/GenericProductsModal';
+import { AdaptivePrice } from '../common/AdaptivePrice';
 
 interface ConsultaViewProps {
   products: Product[];
@@ -507,29 +508,23 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
                           Preço de Venda (R$)
                         </span>
                         <div className="grid grid-cols-3 gap-1.5 sm:gap-2 text-center">
-                          <div className="rounded-xl bg-slate-100/90 p-1.5 sm:p-2 border-2 border-slate-300 dark:bg-slate-800 dark:border-slate-700 min-w-0 shadow-sm">
-                            <span className="block text-[9px] sm:text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-wider">
+                          <div className="rounded-xl bg-slate-100/90 p-1.5 sm:p-2 border-2 border-slate-300 dark:bg-slate-800 dark:border-slate-700 min-w-0 shadow-sm flex flex-col justify-center">
+                            <span className="block text-[9px] sm:text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-wider mb-0.5">
                               TABELA
                             </span>
-                            <span className="font-mono text-sm sm:text-base md:text-lg font-black text-slate-900 dark:text-white truncate block mt-0.5">
-                              {formatPriceOnlyNumber(product.preco_tabela)}
-                            </span>
+                            <AdaptivePrice value={product.preco_tabela} />
                           </div>
-                          <div className="rounded-xl bg-indigo-50 p-1.5 sm:p-2 border-2 border-indigo-300 dark:bg-indigo-950/60 dark:border-indigo-700 min-w-0 shadow-sm">
-                            <span className="block text-[9px] sm:text-[10px] font-black text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">
+                          <div className="rounded-xl bg-indigo-50 p-1.5 sm:p-2 border-2 border-indigo-300 dark:bg-indigo-950/60 dark:border-indigo-700 min-w-0 shadow-sm flex flex-col justify-center">
+                            <span className="block text-[9px] sm:text-[10px] font-black text-indigo-700 dark:text-indigo-300 uppercase tracking-wider mb-0.5">
                               SUGERIDO
                             </span>
-                            <span className="font-mono text-sm sm:text-base md:text-lg font-black text-indigo-800 dark:text-indigo-200 truncate block mt-0.5">
-                              {formatPriceOnlyNumber(product.preco_sugerido)}
-                            </span>
+                            <AdaptivePrice value={product.preco_sugerido} colorClass="text-indigo-800 dark:text-indigo-200" />
                           </div>
-                          <div className="rounded-xl bg-emerald-50 p-1.5 sm:p-2 border-2 border-emerald-300 dark:bg-emerald-950/60 dark:border-emerald-700 min-w-0 shadow-sm">
-                            <span className="block text-[9px] sm:text-[10px] font-black text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">
+                          <div className="rounded-xl bg-emerald-50 p-1.5 sm:p-2 border-2 border-emerald-300 dark:bg-emerald-950/60 dark:border-emerald-700 min-w-0 shadow-sm flex flex-col justify-center">
+                            <span className="block text-[9px] sm:text-[10px] font-black text-emerald-800 dark:text-emerald-300 uppercase tracking-wider mb-0.5">
                               MÍNIMO
                             </span>
-                            <span className="font-mono text-sm sm:text-base md:text-lg font-black text-emerald-800 dark:text-emerald-200 truncate block mt-0.5">
-                              {formatPriceOnlyNumber(product.preco_minimo)}
-                            </span>
+                            <AdaptivePrice value={product.preco_minimo} colorClass="text-emerald-800 dark:text-emerald-300" />
                           </div>
                         </div>
                       </div>

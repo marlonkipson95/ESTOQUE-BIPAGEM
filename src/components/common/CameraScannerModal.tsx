@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { BrowserMultiFormatReader } from '@zxing/browser';
-import { X, Camera, Flashlight, RefreshCw, AlertCircle, Keyboard } from 'lucide-react';
+import { BarcodeFormat, DecodeHintType } from '@zxing/library';
+import { X, Camera, Flashlight, RefreshCw, AlertCircle, Keyboard, HelpCircle, Sparkles } from 'lucide-react';
 import { beepService } from '../../services/beepService';
 
 interface CameraScannerModalProps {
@@ -19,13 +20,16 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const nativeDetectorIntervalRef = useRef<any>(null);
 
   const [error, setError] = useState<string | null>(null);
+  const [scanDifficultyWarning, setScanDifficultyWarning] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const [hasTorch, setHasTorch] = useState(false);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [manualCode, setManualCode] = useState('');
   const [showManualInput, setShowManualInput] = useState(false);
+  const [nativeDetectionActive, setNativeDetectionActive] = useState(false);
 
   useEffect(() => {
     if (!isOpen) {
@@ -35,18 +39,47 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
 
     let isSubscribed = true;
     setError(null);
+    setScanDifficultyWarning(false);
+
+    // Timer para avisar caso a câmera demore mais de 6 segundos para ler
+    const timeoutDifficulty = setTimeout(() => {
+      if (isSubscribed) {
+        setScanDifficultyWarning(true);
+      }
+    }, 6000);
 
     const startCamera = async () => {
       try {
-        const codeReader = new BrowserMultiFormatReader();
+        // 1. Configurar hints explícitos para autopeças e comércio
+        const hints = new Map();
+        const formats = [
+          BarcodeFormat.CODE_128,
+          BarcodeFormat.CODE_39,
+          BarcodeFormat.EAN_13,
+          BarcodeFormat.EAN_8,
+          BarcodeFormat.ITF,
+          BarcodeFormat.UPC_A,
+          BarcodeFormat.UPC_E,
+          BarcodeFormat.DATA_MATRIX,
+          BarcodeFormat.QR_CODE,
+        ];
+        hints.set(DecodeHintType.POSSIBLE_FORMATS, formats);
+        hints.set(DecodeHintType.TRY_HARDER, true);
+
+        const codeReader = new BrowserMultiFormatReader(hints);
         codeReaderRef.current = codeReader;
 
+        // 2. Constraints com foco contínuo no celular
         const constraints: MediaStreamConstraints = {
           audio: false,
           video: {
             facingMode: { ideal: facingMode },
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
+            width: { ideal: 1920, min: 1280 },
+            height: { ideal: 1080, min: 720 },
+            advanced: [
+              { focusMode: 'continuous' },
+              { exposureMode: 'continuous' },
+            ] as any,
           },
         };
 
@@ -62,7 +95,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
           await videoRef.current.play();
         }
 
-        // Check torch support
+        // 3. Verificar suporte à lanterna (torch)
         const videoTrack = stream.getVideoTracks()[0];
         if (videoTrack) {
           const capabilities = (videoTrack.getCapabilities ? videoTrack.getCapabilities() : {}) as { torch?: boolean };
@@ -71,20 +104,46 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
           }
         }
 
-        // Continuous scanning
+        const handleDetectedCode = (rawText: string) => {
+          if (!isSubscribed) return;
+          const text = rawText ? rawText.trim().replace(/\s+/g, '') : '';
+          if (text) {
+            beepService.playSuccess();
+            onScan(text);
+            stopCamera();
+            onClose();
+          }
+        };
+
+        // 4. Aceleração nativa por Hardware via BarcodeDetector (Chrome Android / Safari iOS)
+        if ('BarcodeDetector' in window && (window as any).BarcodeDetector) {
+          try {
+            const detector = new (window as any).BarcodeDetector({
+              formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'itf', 'upc_a', 'upc_e', 'qr_code', 'data_matrix']
+            });
+            setNativeDetectionActive(true);
+
+            nativeDetectorIntervalRef.current = setInterval(async () => {
+              if (!videoRef.current || videoRef.current.readyState < 2 || !isSubscribed) return;
+              try {
+                const barcodes = await detector.detect(videoRef.current);
+                if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+                  handleDetectedCode(barcodes[0].rawValue);
+                }
+              } catch {}
+            }, 180);
+          } catch {
+            setNativeDetectionActive(false);
+          }
+        }
+
+        // 5. Fallback Contínuo ZXing
         codeReader.decodeFromVideoElement(videoRef.current!, (result, err) => {
           if (result && isSubscribed) {
-            const rawText = result.getText();
-            const text = rawText ? rawText.trim().replace(/\s+/g, '') : '';
-            if (text) {
-              beepService.playSuccess();
-              onScan(text);
-              stopCamera();
-              onClose();
-            }
+            handleDetectedCode(result.getText());
           }
           if (err && !(err.name === 'NotFoundException')) {
-            // Normal search frame noise, ignore
+            // Ignora frames intermediários normais sem código detectado
           }
         });
       } catch (err: unknown) {
@@ -103,13 +162,17 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
 
     return () => {
       isSubscribed = false;
+      clearTimeout(timeoutDifficulty);
       stopCamera();
     };
   }, [isOpen, facingMode, onClose, onScan]);
 
   const stopCamera = () => {
+    if (nativeDetectorIntervalRef.current) {
+      clearInterval(nativeDetectorIntervalRef.current);
+      nativeDetectorIntervalRef.current = null;
+    }
     if (codeReaderRef.current) {
-      // BrowserMultiFormatReader cleanup if available
       codeReaderRef.current = null;
     }
     if (streamRef.current) {
@@ -167,15 +230,22 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
             <Camera className="h-5 w-5 text-indigo-400" />
             <span className="font-semibold text-sm tracking-wide">{title}</span>
           </div>
-          <button
-            onClick={() => {
-              stopCamera();
-              onClose();
-            }}
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {nativeDetectionActive && (
+              <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded-md border border-emerald-500/30">
+                <Sparkles className="h-3 w-3" /> Hardware IA
+              </span>
+            )}
+            <button
+              onClick={() => {
+                stopCamera();
+                onClose();
+              }}
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white transition"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
         </div>
 
         {/* Camera Stage */}
@@ -187,6 +257,17 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
             muted
             autoPlay
           />
+
+          {/* Difficulty Guidance Banner */}
+          {scanDifficultyWarning && !error && (
+            <div className="absolute top-3 inset-x-3 z-10 rounded-xl bg-amber-950/90 border border-amber-500/50 p-2.5 text-xs text-amber-200 flex items-start gap-2 shadow-lg backdrop-blur-md animate-fadeIn">
+              <HelpCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-bold">Dificuldade para ler?</p>
+                <p className="text-[11px] text-amber-300/90">Aproxime ou afaste a câmera da etiqueta (15 a 25 cm), ative a lanterna ou digite abaixo.</p>
+              </div>
+            </div>
+          )}
 
           {/* Viewfinder Target Graphic */}
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6">

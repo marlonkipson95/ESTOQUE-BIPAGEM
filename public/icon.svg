@@ -1,38 +1,74 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
   <defs>
+    <!-- Background Gradient -->
     <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#0f172a"/>
-      <stop offset="100%" stop-color="#1e293b"/>
+      <stop offset="0%" stop-color="#090d16"/>
+      <stop offset="50%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#1e1b4b"/>
     </linearGradient>
-    <linearGradient id="accentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#6366f1"/>
-      <stop offset="100%" stop-color="#4f46e5"/>
+
+    <!-- Card Badge Gradient -->
+    <linearGradient id="brandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#4f46e5"/>
+      <stop offset="50%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
     </linearGradient>
+
+    <!-- Laser Glow Filter -->
+    <filter id="laserGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- Soft Drop Shadow -->
+    <filter id="boxShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#000000" flood-opacity="0.6"/>
+    </filter>
   </defs>
-  <rect width="512" height="512" rx="96" fill="url(#bgGrad)"/>
-  
-  <!-- Barcode pattern -->
-  <g fill="#94a3b8" opacity="0.9">
-    <rect x="96" y="140" width="16" height="140" rx="4"/>
-    <rect x="124" y="140" width="8" height="140" rx="4"/>
-    <rect x="144" y="140" width="24" height="140" rx="4"/>
-    <rect x="180" y="140" width="12" height="140" rx="4"/>
-    <rect x="204" y="140" width="32" height="140" rx="4"/>
-    <rect x="248" y="140" width="8" height="140" rx="4"/>
-    <rect x="268" y="140" width="20" height="140" rx="4"/>
-    <rect x="300" y="140" width="12" height="140" rx="4"/>
-    <rect x="324" y="140" width="28" height="140" rx="4"/>
-    <rect x="364" y="140" width="16" height="140" rx="4"/>
-    <rect x="392" y="140" width="24" height="140" rx="4"/>
+
+  <!-- Main Background Container with sleek squircle corners -->
+  <rect width="512" height="512" rx="112" fill="url(#bgGrad)"/>
+  <rect x="4" y="4" width="504" height="504" rx="108" fill="none" stroke="#6366f1" stroke-width="3" stroke-opacity="0.35"/>
+
+  <!-- Stylized Warehouse Barcode Bars -->
+  <g fill="#94a3b8" opacity="0.85" transform="translate(0, -10)">
+    <rect x="88" y="110" width="18" height="150" rx="5"/>
+    <rect x="118" y="110" width="10" height="150" rx="4"/>
+    <rect x="140" y="110" width="28" height="150" rx="6"/>
+    <rect x="180" y="110" width="14" height="150" rx="4"/>
+    <rect x="206" y="110" width="36" height="150" rx="6"/>
+    <rect x="254" y="110" width="10" height="150" rx="4"/>
+    <rect x="276" y="110" width="24" height="150" rx="5"/>
+    <rect x="312" y="110" width="14" height="150" rx="4"/>
+    <rect x="338" y="110" width="32" height="150" rx="6"/>
+    <rect x="382" y="110" width="18" height="150" rx="5"/>
+    <rect x="412" y="110" width="24" height="150" rx="5"/>
   </g>
-  
-  <!-- Laser scan line -->
-  <line x1="80" y1="210" x2="432" y2="210" stroke="#f43f5e" stroke-width="8" stroke-linecap="round"/>
-  
-  <!-- Warehouse Location Box / Rack symbol -->
-  <g transform="translate(156, 310)">
-    <rect x="0" y="0" width="200" height="90" rx="16" fill="url(#accentGrad)"/>
-    <text x="100" y="42" fill="#ffffff" font-family="system-ui, sans-serif" font-weight="900" font-size="24" text-anchor="middle" letter-spacing="1.5">KIPSTOCK</text>
-    <text x="100" y="72" fill="#fde047" font-family="system-ui, sans-serif" font-weight="700" font-size="18" text-anchor="middle" letter-spacing="3">ESTOQUE</text>
+
+  <!-- Glowing Laser Scan Line with target endpoints -->
+  <g filter="url(#laserGlow)">
+    <line x1="64" y1="185" x2="448" y2="185" stroke="#ef4444" stroke-width="7" stroke-linecap="round"/>
+    <line x1="72" y1="185" x2="440" y2="185" stroke="#f43f5e" stroke-width="4" stroke-linecap="round"/>
+    <line x1="80" y1="185" x2="432" y2="185" stroke="#ffffff" stroke-width="2" stroke-linecap="round"/>
+  </g>
+
+  <!-- Central Laser Targeting Reticle Corner Highlights -->
+  <path d="M 64 165 L 64 185 L 84 185" fill="none" stroke="#f43f5e" stroke-width="4" stroke-linecap="round"/>
+  <path d="M 448 165 L 448 185 L 428 185" fill="none" stroke="#f43f5e" stroke-width="4" stroke-linecap="round"/>
+
+  <!-- Warehouse Smart Location Cube Badge -->
+  <g transform="translate(106, 290)" filter="url(#boxShadow)">
+    <rect x="0" y="0" width="300" height="135" rx="28" fill="url(#brandGrad)"/>
+    <rect x="2" y="2" width="296" height="131" rx="26" fill="none" stroke="#ffffff" stroke-width="2" stroke-opacity="0.3"/>
+    
+    <!-- KipStock Primary Typography -->
+    <text x="150" y="58" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-weight="900" font-size="38" text-anchor="middle" letter-spacing="3">KIPSTOCK</text>
+    
+    <!-- Subtitle Pill -->
+    <rect x="35" y="80" width="230" height="34" rx="17" fill="#0f172a" fill-opacity="0.6"/>
+    <text x="150" y="103" fill="#38bdf8" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-weight="800" font-size="14" text-anchor="middle" letter-spacing="2.5">GESTÃO &amp; BIPAGEM</text>
   </g>
 </svg>

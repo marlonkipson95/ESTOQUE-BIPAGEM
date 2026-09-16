@@ -14,6 +14,7 @@ import {
 import { Product } from '../../types';
 import { apiService } from '../../services/apiService';
 import { beepService } from '../../services/beepService';
+import { AdaptivePrice } from './AdaptivePrice';
 
 interface GenericProductsModalProps {
   isOpen: boolean;
@@ -281,24 +282,18 @@ export const GenericProductsModal: React.FC<GenericProductsModalProps> = ({
                           <span className="text-[10px] uppercase font-black tracking-wider text-slate-500 dark:text-slate-400 block mb-1">
                             Preço de Venda (R$)
                           </span>
-                          <div className="grid grid-cols-3 gap-2 text-center max-w-sm">
-                            <div className="rounded-lg bg-slate-50 p-1.5 border border-slate-200 dark:bg-slate-800 dark:border-slate-700">
-                              <span className="block text-[9px] uppercase font-black text-slate-500">Tabela</span>
-                              <span className="font-mono text-xs font-black text-slate-900 dark:text-white">
-                                {formatPriceNumber(rel.preco_tabela)}
-                              </span>
+                          <div className="grid grid-cols-3 gap-1.5 sm:gap-2 text-center max-w-sm">
+                            <div className="rounded-lg bg-slate-50 p-1.5 border border-slate-200 dark:bg-slate-800 dark:border-slate-700 flex flex-col justify-center">
+                              <span className="block text-[9px] uppercase font-black text-slate-500 mb-0.5">Tabela</span>
+                              <AdaptivePrice value={rel.preco_tabela} />
                             </div>
-                            <div className="rounded-lg bg-indigo-50/70 p-1.5 border border-indigo-200 dark:bg-indigo-950/50 dark:border-indigo-800">
-                              <span className="block text-[9px] uppercase font-black text-indigo-700 dark:text-indigo-300">Sugerido</span>
-                              <span className="font-mono text-xs font-black text-indigo-800 dark:text-indigo-200">
-                                {formatPriceNumber(rel.preco_sugerido)}
-                              </span>
+                            <div className="rounded-lg bg-indigo-50/70 p-1.5 border border-indigo-200 dark:bg-indigo-950/50 dark:border-indigo-800 flex flex-col justify-center">
+                              <span className="block text-[9px] uppercase font-black text-indigo-700 dark:text-indigo-300 mb-0.5">Sugerido</span>
+                              <AdaptivePrice value={rel.preco_sugerido} colorClass="text-indigo-800 dark:text-indigo-200" />
                             </div>
-                            <div className="rounded-lg bg-emerald-50/70 p-1.5 border border-emerald-200 dark:bg-emerald-950/50 dark:border-emerald-800">
-                              <span className="block text-[9px] uppercase font-black text-emerald-800 dark:text-emerald-300">Mínimo</span>
-                              <span className="font-mono text-xs font-black text-emerald-800 dark:text-emerald-200">
-                                {formatPriceNumber(rel.preco_minimo)}
-                              </span>
+                            <div className="rounded-lg bg-emerald-50/70 p-1.5 border border-emerald-200 dark:bg-emerald-950/50 dark:border-indigo-800 flex flex-col justify-center">
+                              <span className="block text-[9px] uppercase font-black text-emerald-800 dark:text-emerald-300 mb-0.5">Mínimo</span>
+                              <AdaptivePrice value={rel.preco_minimo} colorClass="text-emerald-800 dark:text-emerald-300" />
                             </div>
                           </div>
                         </div>
