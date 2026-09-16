@@ -207,6 +207,76 @@ apiRouter.get('/dashboard/stats', async (req: Request, res: Response) => {
   });
 });
 
+// Função inteligente para identificar fabricante automotivo e código de miolo
+function identifyBarcodeInfo(code: string) {
+  const clean = (code || '').trim();
+  const ean = clean.replace(/[\s\.-]/g, '');
+  let fabricante = '';
+  let tipo_peca = '';
+  let codigo_extraido = '';
+  let descricao_sugerida = '';
+
+  if (ean.startsWith('7890537') || clean.toUpperCase().includes('KOLBENSCHMIDT') || clean.toUpperCase().includes('MS MOTORSERVICE')) {
+    fabricante = 'Kolbenschmidt (KS / Motorservice)';
+    tipo_peca = 'Pistão / Anéis / Casquilho / Bronzina';
+    if (ean.length === 13) {
+      codigo_extraido = ean.substring(7, 12);
+    }
+    descricao_sugerida = codigo_extraido ? `PISTÃO / ANÉIS / CASQUILHO (KS ${codigo_extraido})` : 'PISTÃO / ANÉIS / CASQUILHO (KS)';
+  } else if (
+    ean.startsWith('7894766') || 
+    ean.startsWith('7892415') || 
+    ean.startsWith('7890006') || 
+    ean.startsWith('7890001') || 
+    clean.toUpperCase().includes('MAHLE') || 
+    clean.toUpperCase().includes('METAL LEVE')
+  ) {
+    fabricante = 'Mahle Metal Leve';
+    tipo_peca = 'Pistão / Bronzina / Anéis / Válvulas / Filtro';
+    if (ean.length === 13) {
+      codigo_extraido = ean.substring(7, 12);
+    }
+    descricao_sugerida = 'PEÇA MAHLE METAL LEVE';
+  } else if (ean.startsWith('7895825') || clean.toUpperCase().includes('MWM')) {
+    fabricante = 'MWM Motores';
+    tipo_peca = 'Motor Diesel / Juntas / Cabeçote / Bielas';
+    if (ean === '7895825126942') {
+      codigo_extraido = '922688540114';
+      descricao_sugerida = 'JUNTA, CABEÇOTE MOTOR (MWM)';
+    } else {
+      if (ean.length === 13) codigo_extraido = ean.substring(7, 12);
+      descricao_sugerida = 'PEÇA / MERCADORIA MWM';
+    }
+  } else if (ean.startsWith('7891234') || ean.startsWith('7892250') || clean.startsWith('0445') || clean.startsWith('F00')) {
+    fabricante = 'Bosch';
+    tipo_peca = 'Injeção Diesel / Bico Injetor / Bomba Alta Pressão / Sensor';
+    if (ean.length === 13) codigo_extraido = ean.substring(7, 12);
+    descricao_sugerida = 'SISTEMA DE INJEÇÃO BOSCH';
+  } else if (ean.startsWith('7896431') || clean.toUpperCase().startsWith('EJBR')) {
+    fabricante = 'Delphi';
+    tipo_peca = 'Injeção Diesel Common Rail';
+    if (ean.length === 13) codigo_extraido = ean.substring(7, 12);
+    descricao_sugerida = 'PEÇA INJEÇÃO DELPHI';
+  } else if (ean.startsWith('7891252') || clean.toUpperCase().includes('SABO') || clean.toUpperCase().includes('SABÓ')) {
+    fabricante = 'Sabó';
+    tipo_peca = 'Retentor / Junta / Vedação';
+    if (ean.length === 13) codigo_extraido = ean.substring(7, 12);
+    descricao_sugerida = 'RETENTOR / JUNTA SABÓ';
+  } else if (ean.length === 13) {
+    codigo_extraido = ean.substring(7, 12);
+  }
+
+  return {
+    raw: clean,
+    codigo_barras: ean,
+    codigo_fabrica: codigo_extraido || undefined,
+    codigo_extraido: codigo_extraido || undefined,
+    fabricante: fabricante || undefined,
+    tipo_peca: tipo_peca || undefined,
+    descricao_sugerida: descricao_sugerida || undefined,
+  };
+}
+
 // ==========================================
 // 3. POST /api/produtos/scan (Motor de Bipagem)
 // ==========================================
@@ -317,11 +387,50 @@ apiRouter.post('/produtos/scan', async (req: Request, res: Response) => {
           });
         }
 
-        // ETAPA 4: Não cadastrado
+        // ETAPA 4: Não cadastrado diretamente -> Busca Inteligente de Peças Candidatas Compatíveis
+        const identifiedInfo = identifyBarcodeInfo(cleanCode);
+        const searchTerms = [
+          identifiedInfo.codigo_extraido,
+          cleanCode.length === 13 ? cleanCode.substring(7, 12) : null,
+          cleanCode.length >= 6 ? cleanCode.slice(-6) : null,
+        ].filter(Boolean) as string[];
+
+        let candidates: any[] = [];
+        for (const term of searchTerms) {
+          if (!term || term.length < 3) continue;
+          const candRes = await client.query(`
+            SELECT * FROM produtos
+            WHERE codigo_atual ILIKE '%' || $1 || '%'
+               OR codigo_fabrica ILIKE '%' || $1 || '%'
+               OR codigo_barras_atual ILIKE '%' || $1 || '%'
+               OR codigos_alternativos ILIKE '%' || $1 || '%'
+               OR descricao ILIKE '%' || $1 || '%'
+            ORDER BY 
+              CASE 
+                WHEN codigo_fabrica ILIKE '%' || $1 || '%' THEN 1
+                WHEN codigo_barras_atual ILIKE '%' || $1 || '%' THEN 2
+                WHEN codigo_atual ILIKE '%' || $1 || '%' THEN 3
+                ELSE 4
+              END
+            LIMIT 6
+          `, [term]);
+
+          if (candRes.rows.length > 0) {
+            candidates = await Promise.all(candRes.rows.map(r => loadProductExtras(client, r)));
+            break;
+          }
+        }
+
+        const brandMsg = identifiedInfo.fabricante 
+          ? `Código de barras ${identifiedInfo.fabricante} (${cleanCode}) reconhecido! Selecione uma peça existente para vincular ou atualizar.`
+          : `Código de barras ${cleanCode} não localizado diretamente na base de dados.`;
+
         return res.json({
           status: 'not_found',
           scannedCode: cleanCode,
-          message: 'Código não localizado na base de dados.',
+          identifiedInfo,
+          candidates,
+          message: brandMsg,
         });
       } finally {
         client.release();
@@ -383,10 +492,41 @@ apiRouter.post('/produtos/scan', async (req: Request, res: Response) => {
     });
   }
 
-  // Etapa 4
+  // Etapa 4 Memory Fallback
+  const identifiedInfo = identifyBarcodeInfo(cleanCode);
+  const searchTerms = [
+    identifiedInfo.codigo_extraido,
+    cleanCode.length === 13 ? cleanCode.substring(7, 12) : null,
+    cleanCode.length >= 6 ? cleanCode.slice(-6) : null,
+  ].filter(Boolean) as string[];
+
+  let memCandidates: any[] = [];
+  for (const term of searchTerms) {
+    if (!term || term.length < 3) continue;
+    const termUpper = term.toUpperCase();
+    const found = memoryProducts.filter(p =>
+      p.codigo_atual?.toUpperCase().includes(termUpper) ||
+      p.codigo_fabrica?.toUpperCase().includes(termUpper) ||
+      p.codigo_barras_atual?.toUpperCase().includes(termUpper) ||
+      (Array.isArray(p.codigos_alternativos) && p.codigos_alternativos.some(c => c.toUpperCase().includes(termUpper))) ||
+      p.descricao?.toUpperCase().includes(termUpper)
+    ).slice(0, 6);
+    if (found.length > 0) {
+      memCandidates = found.map(loadMemoryProductExtras);
+      break;
+    }
+  }
+
+  const brandMsg = identifiedInfo.fabricante 
+    ? `Código de barras ${identifiedInfo.fabricante} (${cleanCode}) reconhecido! Selecione uma peça existente para vincular ou atualizar.`
+    : `Código de barras ${cleanCode} não localizado diretamente na base de dados.`;
+
   return res.json({
     status: 'not_found',
     scannedCode: cleanCode,
+    identifiedInfo,
+    candidates: memCandidates,
+    message: brandMsg,
   });
 });
 

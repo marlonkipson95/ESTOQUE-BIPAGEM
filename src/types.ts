@@ -82,6 +82,8 @@ export interface ScanResult {
   status: ScanMatchStatus;
   product?: Product;
   matchedCodeHistory?: ProductCodeHistory;
+  identifiedInfo?: ScannedLabelInfo;
+  candidates?: Product[];
   message?: string;
   timestamp: string;
 }
@@ -183,6 +185,8 @@ export interface ScannedLabelInfo {
   codigo_fabrica?: string;
   codigo_interno?: string;
   fabricante?: string;
+  tipo_peca?: string;
+  codigo_extraido?: string;
   descricao_sugerida?: string;
 }
 

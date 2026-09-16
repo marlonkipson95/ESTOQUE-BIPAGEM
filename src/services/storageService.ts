@@ -9,6 +9,7 @@ import {
   CodeType
 } from '../types';
 import { apiService } from './apiService';
+import { parseScannedLabel } from '../utils/barcodeParser';
 import {
   INITIAL_PRODUCTS,
   INITIAL_CODE_HISTORY,
@@ -302,11 +303,42 @@ class StorageService {
       };
     }
 
-    // ETAPA 4: Nenhum identificador encontrado
+    // ETAPA 4: Nenhum identificador encontrado diretamente -> Busca Inteligente de Peças Candidatas
+    const identifiedInfo = parseScannedLabel(code);
+    const searchTerms = [
+      identifiedInfo.codigo_extraido,
+      code.length === 13 ? code.substring(7, 12) : null,
+      code.length >= 6 ? code.slice(-6) : null,
+    ].filter(Boolean) as string[];
+
+    let candidates: Product[] = [];
+    for (const term of searchTerms) {
+      if (!term || term.length < 3) continue;
+      const termLower = term.toLowerCase();
+      const found = products.filter(p =>
+        (p.codigo_atual && p.codigo_atual.toLowerCase().includes(termLower)) ||
+        (p.codigo_fabrica && p.codigo_fabrica.toLowerCase().includes(termLower)) ||
+        (p.codigo_barras_atual && p.codigo_barras_atual.toLowerCase().includes(termLower)) ||
+        (Array.isArray(p.codigos_alternativos) && p.codigos_alternativos.some(c => c.toLowerCase().includes(termLower))) ||
+        (p.descricao && p.descricao.toLowerCase().includes(termLower))
+      ).slice(0, 6);
+
+      if (found.length > 0) {
+        candidates = found;
+        break;
+      }
+    }
+
+    const brandMsg = identifiedInfo.fabricante 
+      ? `Código de barras ${identifiedInfo.fabricante} (${code}) reconhecido! Selecione uma peça existente para vincular ou atualizar.`
+      : 'Nenhum produto cadastrado diretamente com este identificador.';
+
     return {
       code,
       status: 'not_found',
-      message: 'Nenhum produto cadastrado com este identificador.',
+      identifiedInfo,
+      candidates,
+      message: brandMsg,
       timestamp: new Date().toISOString(),
     };
   }

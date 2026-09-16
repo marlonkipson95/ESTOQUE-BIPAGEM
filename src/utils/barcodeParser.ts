@@ -67,24 +67,115 @@ export function parseScannedLabel(input: string): ScannedLabelInfo {
     }
   }
 
-  // 3. Manufacturer Signature Recognition (e.g. MWM Navistar / Tupy)
-  // MWM Brazil EAN barcode prefix: 7895825...
-  // MWM Part numbers often start with 922688... or 9...
+  // 3. Manufacturer Signature Recognition & Intelligent Part Identification
   const eanVal = result.codigo_barras || '';
   const facVal = result.codigo_fabrica || '';
 
-  if (eanVal.startsWith('7895825') || facVal.startsWith('922688') || cleanInput.toUpperCase().includes('MWM')) {
-    result.fabricante = 'MWM';
+  // 3a. Kolbenschmidt (KS / MS Motorservice / Rheinmetall)
+  // Prefix: 7890537...
+  if (eanVal.startsWith('7890537') || cleanInput.toUpperCase().includes('KOLBENSCHMIDT') || cleanInput.toUpperCase().includes('MS MOTORSERVICE')) {
+    result.fabricante = 'Kolbenschmidt (KS / Motorservice)';
+    result.tipo_peca = 'Pistão / Anéis / Casquilho / Bronzina';
+
+    // Digits 7 to 12 in EAN-13 contain the part number sequence (e.g. 7890537 13228 1 -> 13228)
+    if (eanVal.length === 13) {
+      const core = eanVal.substring(7, 12);
+      result.codigo_extraido = core;
+      if (!result.codigo_fabrica) {
+        result.codigo_fabrica = core;
+      }
+    }
+
+    if (eanVal === '7890537132281' || result.codigo_extraido === '13228' || facVal.includes('13228')) {
+      result.descricao_sugerida = 'PISTÃO / ANÉIS / CASQUILHO (KS 13228)';
+    } else {
+      result.descricao_sugerida = 'PISTÃO / ANÉIS / CASQUILHO (KOLBENSCHMIDT KS)';
+    }
+  }
+
+  // 3b. Mahle Metal Leve / Cofap
+  // Prefixes: 7894766, 7892415, 7890006, 7890001
+  else if (
+    eanVal.startsWith('7894766') || 
+    eanVal.startsWith('7892415') || 
+    eanVal.startsWith('7890006') || 
+    eanVal.startsWith('7890001') ||
+    cleanInput.toUpperCase().includes('MAHLE') || 
+    cleanInput.toUpperCase().includes('METAL LEVE')
+  ) {
+    result.fabricante = 'Mahle Metal Leve';
+    result.tipo_peca = 'Pistão / Bronzina / Anéis / Válvulas / Filtro';
+    if (eanVal.length === 13) {
+      result.codigo_extraido = eanVal.substring(7, 12);
+      if (!result.codigo_fabrica) {
+        result.codigo_fabrica = result.codigo_extraido;
+      }
+    }
+    result.descricao_sugerida = 'PEÇA MAHLE METAL LEVE';
+  }
+
+  // 3c. MWM (Navistar / Tupy)
+  // Prefix: 7895825...
+  else if (eanVal.startsWith('7895825') || facVal.startsWith('922688') || cleanInput.toUpperCase().includes('MWM')) {
+    result.fabricante = 'MWM Motores';
+    result.tipo_peca = 'Motor Diesel / Juntas / Cabeçote / Bielas';
     result.descricao_sugerida = 'PEÇA / MERCADORIA MWM';
 
-    // If scanned was MWM EAN 7895825126942, part number is 922688540114
     if (eanVal === '7895825126942' && !result.codigo_fabrica) {
       result.codigo_fabrica = '922688540114';
+      result.codigo_extraido = '922688540114';
       result.descricao_sugerida = 'JUNTA, CABEÇOTE MOTOR (MWM)';
     } else if (facVal === '922688540114' && !result.codigo_barras) {
       result.codigo_barras = '7895825126942';
+      result.codigo_extraido = '922688540114';
       result.descricao_sugerida = 'JUNTA, CABEÇOTE MOTOR (MWM)';
+    } else if (eanVal.length === 13) {
+      result.codigo_extraido = eanVal.substring(7, 12);
     }
+  }
+
+  // 3d. Bosch
+  // Prefixes: 7891234, 7892250, 0445, F00...
+  else if (
+    eanVal.startsWith('7891234') || 
+    eanVal.startsWith('7892250') || 
+    cleanInput.startsWith('0445') || 
+    cleanInput.startsWith('F00') ||
+    cleanInput.toUpperCase().includes('BOSCH')
+  ) {
+    result.fabricante = 'Bosch';
+    result.tipo_peca = 'Injeção Diesel / Bico Injetor / Bomba Alta Pressão / Sensor';
+    result.descricao_sugerida = 'SISTEMA DE INJEÇÃO BOSCH';
+    if (eanVal.length === 13) {
+      result.codigo_extraido = eanVal.substring(7, 12);
+    }
+  }
+
+  // 3e. Delphi
+  // Prefix: 7896431, EJBR...
+  else if (eanVal.startsWith('7896431') || cleanInput.toUpperCase().startsWith('EJBR') || cleanInput.toUpperCase().includes('DELPHI')) {
+    result.fabricante = 'Delphi';
+    result.tipo_peca = 'Injeção Diesel Common Rail';
+    result.descricao_sugerida = 'PEÇA INJEÇÃO DELPHI';
+    if (eanVal.length === 13) {
+      result.codigo_extraido = eanVal.substring(7, 12);
+    }
+  }
+
+  // 3f. Sabó
+  // Prefix: 7891252...
+  else if (eanVal.startsWith('7891252') || cleanInput.toUpperCase().includes('SABO') || cleanInput.toUpperCase().includes('SABÓ')) {
+    result.fabricante = 'Sabó';
+    result.tipo_peca = 'Retentor / Junta / Vedação';
+    result.descricao_sugerida = 'RETENTOR / JUNTA SABÓ';
+    if (eanVal.length === 13) {
+      result.codigo_extraido = eanVal.substring(7, 12);
+    }
+  }
+
+  // Generic fallback extraction for any EAN-13
+  if (!result.codigo_extraido && eanVal.length === 13) {
+    result.codigo_extraido = eanVal.substring(7, 12);
   }
 
   return result;

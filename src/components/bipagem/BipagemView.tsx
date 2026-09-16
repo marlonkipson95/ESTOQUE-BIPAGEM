@@ -92,6 +92,88 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
   const [altBarcodeToLink, setAltBarcodeToLink] = useState('');
   const [isLinkingAltBarcode, setIsLinkingAltBarcode] = useState(false);
 
+  // Modal para "Alterar com os dados novos" de peça já cadastrada ao bipar código não cadastrado
+  const [isUpdateNewDataModalOpen, setIsUpdateNewDataModalOpen] = useState(false);
+  const [targetProductToUpdate, setTargetProductToUpdate] = useState<Product | null>(null);
+  const [updateNewDescricao, setUpdateNewDescricao] = useState('');
+  const [updateNewCodigoFabrica, setUpdateNewCodigoFabrica] = useState('');
+  const [updateNewCodigoBarras, setUpdateNewCodigoBarras] = useState('');
+  const [isSavingProductUpdate, setIsSavingProductUpdate] = useState(false);
+
+  const handleOpenUpdateProductModal = (targetProduct: Product) => {
+    setTargetProductToUpdate(targetProduct);
+    const scanned = (scanResult?.code || '').trim();
+    const parsed = scanResult?.identifiedInfo || parseScannedLabel(scanned);
+
+    setUpdateNewCodigoBarras(scanned || targetProduct.codigo_barras_atual || '');
+    setUpdateNewCodigoFabrica(parsed.codigo_extraido || parsed.codigo_fabrica || targetProduct.codigo_fabrica || '');
+    setUpdateNewDescricao(parsed.descricao_sugerida || targetProduct.descricao || '');
+    setIsUpdateNewDataModalOpen(true);
+  };
+
+  const handleSaveProductUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!targetProductToUpdate) return;
+
+    setIsSavingProductUpdate(true);
+    try {
+      const cleanDesc = updateNewDescricao.trim() || targetProductToUpdate.descricao;
+      const cleanFab = updateNewCodigoFabrica.trim() || targetProductToUpdate.codigo_fabrica;
+      const cleanBar = updateNewCodigoBarras.trim() || scanResult?.code || targetProductToUpdate.codigo_barras_atual;
+
+      const updatedFields: Partial<Product> = {
+        descricao: cleanDesc,
+        codigo_fabrica: cleanFab,
+        codigo_barras_atual: cleanBar,
+        corredor: targetProductToUpdate.corredor,
+        baia: targetProductToUpdate.baia,
+        nivel: targetProductToUpdate.nivel,
+        locacao: targetProductToUpdate.locacao,
+        quantidade: targetProductToUpdate.quantidade,
+        estoque_minimo: targetProductToUpdate.estoque_minimo,
+        custo_unitario: targetProductToUpdate.custo_unitario,
+        preco_tabela: targetProductToUpdate.preco_tabela,
+        preco_sugerido: targetProductToUpdate.preco_sugerido,
+        preco_minimo: targetProductToUpdate.preco_minimo,
+      };
+
+      const apiRes = await apiService.updateProduct(targetProductToUpdate.id, updatedFields);
+      if (cleanBar) {
+        await apiService.vincularCodigo(targetProductToUpdate.id, cleanBar, 'codigo_barras', 'Atualização com novos dados de bipagem').catch(() => {});
+      }
+
+      const storageRes = storageService.updateProduct(targetProductToUpdate.id, updatedFields);
+      if (cleanBar) {
+        storageService.vincularCodigoBarras(targetProductToUpdate.id, cleanBar);
+      }
+
+      const finalProduct: Product = apiRes?.product || storageRes || {
+        ...targetProductToUpdate,
+        ...updatedFields,
+      };
+
+      beepService.playSuccess();
+      setLocationSuccessMsg(`✓ Peça ${finalProduct.codigo_atual} atualizada com os novos dados e código ${cleanBar}! Locação física e estoque preservados.`);
+      setTimeout(() => setLocationSuccessMsg(''), 6000);
+
+      setScanResult({
+        code: cleanBar,
+        status: 'found_current',
+        product: finalProduct,
+        message: 'Produto atualizado e localizado com sucesso!',
+        timestamp: new Date().toISOString(),
+      });
+
+      setIsUpdateNewDataModalOpen(false);
+      setTargetProductToUpdate(null);
+    } catch (err: any) {
+      beepService.playError();
+      alert('Erro ao atualizar produto: ' + (err.message || 'Falha de conexão'));
+    } finally {
+      setIsSavingProductUpdate(false);
+    }
+  };
+
   const handleSearchLinkProducts = async (term: string) => {
     setSearchLinkTerm(term);
     const clean = term.trim();
@@ -387,19 +469,52 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
     try {
       // 1. Try server-side PostgreSQL scan first
       const serverResult = await apiService.scanCode(code);
-      if (serverResult && serverResult.product) {
-        setScanResult({
-          code,
-          status: serverResult.status,
-          product: serverResult.product,
-          matchedCodeHistory: serverResult.historicalRecord,
-          message: serverResult.message,
-          timestamp: new Date().toISOString(),
-        });
-
+      if (serverResult && serverResult.status) {
         if (serverResult.status === 'found_current') {
+          setScanResult({
+            code,
+            status: serverResult.status,
+            product: serverResult.product,
+            matchedCodeHistory: serverResult.historicalRecord,
+            message: serverResult.message,
+            timestamp: new Date().toISOString(),
+          });
           beepService.playSuccess();
+        } else if (serverResult.status === 'not_found') {
+          beepService.playWarning();
+          const parsed = (serverResult as any).identifiedInfo || parseScannedLabel(code);
+          const candidates: Product[] = (serverResult as any).candidates || [];
+
+          setScanResult({
+            code,
+            status: 'not_found',
+            identifiedInfo: parsed,
+            candidates,
+            message: serverResult.message || 'Código não localizado diretamente no cadastro.',
+            timestamp: new Date().toISOString(),
+          });
+
+          setInlineDescricao(parsed.descricao_sugerida || (parsed.fabricante ? `PEÇA ${parsed.fabricante}` : ''));
+          setNotFoundTab('link');
+
+          const initialSearch = parsed.codigo_extraido || parsed.codigo_fabrica || '';
+          setSearchLinkTerm(initialSearch);
+          if (candidates.length > 0) {
+            setSearchLinkResults(candidates);
+          } else if (initialSearch) {
+            handleSearchLinkProducts(initialSearch);
+          } else {
+            setSearchLinkResults([]);
+          }
         } else {
+          setScanResult({
+            code,
+            status: serverResult.status,
+            product: serverResult.product,
+            matchedCodeHistory: serverResult.historicalRecord,
+            message: serverResult.message,
+            timestamp: new Date().toISOString(),
+          });
           beepService.playWarning();
         }
       } else {
@@ -410,14 +525,19 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
         if (localResult.status === 'found_current') {
           beepService.playSuccess();
         } else if (localResult.status === 'not_found') {
-          beepService.playError();
-          const parsed = parseScannedLabel(code);
+          beepService.playWarning();
+          const parsed = localResult.identifiedInfo || parseScannedLabel(code);
+          const candidates = localResult.candidates || [];
           setInlineDescricao(parsed.descricao_sugerida || (parsed.fabricante ? `PEÇA ${parsed.fabricante}` : ''));
           setNotFoundTab('link');
-          if (parsed.codigo_fabrica) {
-            handleSearchLinkProducts(parsed.codigo_fabrica);
+
+          const initialSearch = parsed.codigo_extraido || parsed.codigo_fabrica || '';
+          setSearchLinkTerm(initialSearch);
+          if (candidates.length > 0) {
+            setSearchLinkResults(candidates);
+          } else if (initialSearch) {
+            handleSearchLinkProducts(initialSearch);
           } else {
-            setSearchLinkTerm('');
             setSearchLinkResults([]);
           }
         } else {
@@ -431,14 +551,19 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
       if (localResult.status === 'found_current') {
         beepService.playSuccess();
       } else if (localResult.status === 'not_found') {
-        beepService.playError();
-        const parsed = parseScannedLabel(code);
+        beepService.playWarning();
+        const parsed = localResult.identifiedInfo || parseScannedLabel(code);
+        const candidates = localResult.candidates || [];
         setInlineDescricao(parsed.descricao_sugerida || (parsed.fabricante ? `PEÇA ${parsed.fabricante}` : ''));
         setNotFoundTab('link');
-        if (parsed.codigo_fabrica) {
-          handleSearchLinkProducts(parsed.codigo_fabrica);
+
+        const initialSearch = parsed.codigo_extraido || parsed.codigo_fabrica || '';
+        setSearchLinkTerm(initialSearch);
+        if (candidates.length > 0) {
+          setSearchLinkResults(candidates);
+        } else if (initialSearch) {
+          handleSearchLinkProducts(initialSearch);
         } else {
-          setSearchLinkTerm('');
           setSearchLinkResults([]);
         }
       } else {
@@ -1180,35 +1305,50 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
                 </div>
               </div>
 
-              {/* Detected Codes Banner */}
+              {/* Detected Codes Banner & Intelligent Recognition */}
               {(() => {
-                const parsed = parseScannedLabel(scanResult.code);
+                const parsed = scanResult.identifiedInfo || parseScannedLabel(scanResult.code);
                 return (
-                  <div className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50/70 p-3.5 dark:border-indigo-900 dark:bg-indigo-950/40">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-indigo-800 dark:text-indigo-300 mb-2">
-                      <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-                      <span>Códigos Detectados pelo Bipe:</span>
+                  <div className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50/80 p-4 dark:border-indigo-900 dark:bg-indigo-950/40 shadow-sm">
+                    <div className="flex items-center justify-between gap-2 flex-wrap mb-2.5">
+                      <div className="flex items-center gap-1.5 text-xs font-black text-indigo-900 dark:text-indigo-200">
+                        <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                        <span>Identificação Inteligente do Bipe:</span>
+                      </div>
                       {parsed.fabricante && (
-                        <span className="ml-auto rounded bg-indigo-600 text-white px-2 py-0.5 text-[10px] font-black">
-                          Fabricante: {parsed.fabricante}
+                        <span className="rounded-full bg-indigo-600 text-white px-3 py-0.5 text-[11px] font-black uppercase tracking-wider shadow-sm">
+                          {parsed.fabricante}
                         </span>
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 text-xs font-mono">
-                      <div className="rounded-lg bg-white p-2 border border-indigo-100 dark:bg-slate-800 dark:border-indigo-900">
-                        <span className="block text-[10px] text-slate-500 uppercase font-sans font-semibold">Cód. Barras (Bipado)</span>
-                        <span className="font-bold text-slate-900 dark:text-white truncate block">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs font-mono">
+                      <div className="rounded-lg bg-white p-2.5 border border-indigo-100 dark:bg-slate-800 dark:border-indigo-900 shadow-xs">
+                        <span className="block text-[10px] text-slate-500 uppercase font-sans font-bold">Cód. Barras Bipado</span>
+                        <span className="font-black text-indigo-600 dark:text-indigo-300 text-sm truncate block">
                           {parsed.codigo_barras || scanResult.code}
                         </span>
                       </div>
-                      <div className="rounded-lg bg-white p-2 border border-indigo-100 dark:bg-slate-800 dark:border-indigo-900">
-                        <span className="block text-[10px] text-slate-500 uppercase font-sans font-semibold">Cód. Fábrica Sugerido</span>
-                        <span className="font-bold text-slate-900 dark:text-white truncate block">
-                          {parsed.codigo_fabrica || '—'}
+                      <div className="rounded-lg bg-white p-2.5 border border-indigo-100 dark:bg-slate-800 dark:border-indigo-900 shadow-xs">
+                        <span className="block text-[10px] text-slate-500 uppercase font-sans font-bold">Código Extraído / Fábrica</span>
+                        <span className="font-black text-slate-900 dark:text-white text-sm truncate block">
+                          {parsed.codigo_extraido || parsed.codigo_fabrica || '—'}
+                        </span>
+                      </div>
+                      <div className="rounded-lg bg-white p-2.5 border border-indigo-100 dark:bg-slate-800 dark:border-indigo-900 shadow-xs">
+                        <span className="block text-[10px] text-slate-500 uppercase font-sans font-bold">Tipo da Peça</span>
+                        <span className="font-black text-amber-700 dark:text-amber-400 text-xs truncate block font-sans">
+                          {parsed.tipo_peca || 'Peça Automotiva'}
                         </span>
                       </div>
                     </div>
+
+                    {parsed.descricao_sugerida && (
+                      <div className="mt-2.5 text-[11px] text-indigo-950 dark:text-indigo-200 bg-white/70 dark:bg-slate-800/80 p-2 rounded-lg border border-indigo-100 dark:border-indigo-900">
+                        <span className="font-bold text-indigo-600 dark:text-indigo-400">Sugestão de Descrição: </span>
+                        <span className="font-semibold">{parsed.descricao_sugerida}</span>
+                      </div>
+                    )}
                   </div>
                 );
               })()}
@@ -1232,7 +1372,7 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
                     }`}
                   >
                     <Link2 className="h-4 w-4" />
-                    <span>1. Já Tem Cadastro? Vincular a Peça</span>
+                    <span>1. Já Tem Cadastro? Vincular ou Atualizar Peça</span>
                   </button>
 
                   <button
@@ -1245,7 +1385,7 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
                     }`}
                   >
                     <PlusCircle className="h-4 w-4" />
-                    <span>2. Peça Nova (Definir Locação)</span>
+                    <span>2. Cadastrar como Peça Nova</span>
                   </button>
                 </div>
 
@@ -1254,7 +1394,7 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
                   <div className="mt-4 space-y-3 animate-fadeIn">
                     <div className="rounded-xl bg-indigo-50/60 p-3 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-900">
                       <p className="text-xs text-indigo-950 dark:text-indigo-200 font-semibold leading-relaxed">
-                        Se este item já está no estoque com outro código ou etiqueta, pesquise abaixo pelo <strong>Código de Fábrica</strong> (ex: <code className="bg-white dark:bg-slate-800 px-1 py-0.5 rounded font-mono font-bold">800064041100</code> ou <code className="bg-white dark:bg-slate-800 px-1 py-0.5 rounded font-mono font-bold">A14130</code>) ou pelo <strong>Nome da Peça</strong> para vincular este código de barras a ela.
+                        Se este item já possui cadastro no estoque com outro código ou etiqueta, selecione-o abaixo para <strong>apenas vincular o código de barras</strong> (preservando locação e estoque) ou para <strong>alterar com os dados novos</strong> do bipe.
                       </p>
                     </div>
 
@@ -1264,8 +1404,8 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
                         type="text"
                         value={searchLinkTerm}
                         onChange={e => handleSearchLinkProducts(e.target.value)}
-                        placeholder="Digite o código original, fábrica ou descrição para buscar..."
-                        className="w-full rounded-xl border-2 border-indigo-500/50 bg-white pl-10 pr-4 py-3 text-sm font-semibold text-slate-900 placeholder-slate-400 focus:border-indigo-600 focus:outline-none dark:bg-slate-800 dark:text-white"
+                        placeholder="Digite o código de fábrica, código interno ou nome da peça para buscar..."
+                        className="w-full rounded-xl border-2 border-indigo-500/50 bg-white pl-10 pr-4 py-3 text-sm font-semibold text-slate-900 placeholder-slate-400 focus:border-indigo-600 focus:outline-none dark:bg-slate-800 dark:text-white shadow-sm"
                       />
                     </div>
 
@@ -1276,53 +1416,75 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
                     )}
 
                     {searchLinkResults.length > 0 ? (
-                      <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+                      <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+                        <div className="flex items-center gap-1.5 text-xs font-black text-emerald-800 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/50 px-3 py-2 rounded-xl border border-emerald-200 dark:border-emerald-800">
+                          <Sparkles className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                          <span>Peças encontradas no estoque. Escolha a ação desejada:</span>
+                        </div>
+
                         {searchLinkResults.map(p => (
                           <div
                             key={p.id}
-                            className="p-3.5 rounded-xl border-2 border-slate-200 bg-slate-50 dark:bg-slate-800/90 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm hover:border-indigo-500 transition"
+                            className="p-4 rounded-xl border-2 border-slate-200 bg-slate-50 dark:bg-slate-800/90 dark:border-slate-700 flex flex-col gap-3 shadow-sm hover:border-indigo-400 transition"
                           >
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                {p.codigo_fabrica && (
-                                  <span className="font-mono text-sm font-black text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-900 px-2 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
-                                    {p.codigo_fabrica}
+                            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  {p.codigo_fabrica && (
+                                    <span className="font-mono text-sm font-black text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-900 px-2.5 py-0.5 rounded-lg border border-indigo-200 dark:border-indigo-800">
+                                      Fábrica: {p.codigo_fabrica}
+                                    </span>
+                                  )}
+                                  <span className="font-mono text-xs font-bold text-slate-600 dark:text-slate-300 bg-slate-200 dark:bg-slate-700 px-2 py-0.5 rounded">
+                                    Cód: {p.codigo_atual}
                                   </span>
-                                )}
-                                <span className="font-mono text-xs font-bold text-slate-500">
-                                  ({p.codigo_atual})
-                                </span>
-                                <span className="text-[11px] font-black px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                                  {p.quantidade} un em estoque
-                                </span>
-                              </div>
-
-                              <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-1 line-clamp-2">
-                                {p.descricao}
-                              </p>
-
-                              <div className="flex items-center gap-3 text-[11px] text-slate-500 mt-1.5 flex-wrap">
-                                <span className="flex items-center gap-1 font-bold text-amber-700 dark:text-amber-400">
-                                  <MapPin className="h-3 w-3" />
-                                  {p.locacao || (p.corredor ? `C-${p.corredor}-B-${p.baia}-N-${p.nivel}` : 'Sem locação física')}
-                                </span>
-                                {p.codigo_barras_atual && (
-                                  <span className="text-slate-400">
-                                    Cód. barras atual: <code className="font-mono font-semibold">{p.codigo_barras_atual}</code>
+                                  <span className="text-[11px] font-black px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                                    {p.quantidade} un em estoque
                                   </span>
-                                )}
+                                </div>
+
+                                <p className="text-sm font-bold text-slate-900 dark:text-slate-100 mt-2">
+                                  {p.descricao}
+                                </p>
+
+                                <div className="flex items-center gap-3 text-xs text-slate-500 mt-2 flex-wrap">
+                                  <span className="flex items-center gap-1 font-bold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/60 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800">
+                                    <MapPin className="h-3.5 w-3.5" />
+                                    Locação: {p.locacao || (p.corredor ? `C-${p.corredor}-B-${p.baia}-N-${p.nivel}` : 'Sem locação física')}
+                                  </span>
+                                  {p.codigo_barras_atual && (
+                                    <span className="text-slate-500 text-[11px]">
+                                      EAN atual: <code className="font-mono font-semibold">{p.codigo_barras_atual}</code>
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
 
-                            <button
-                              type="button"
-                              disabled={isLinkingBarcode}
-                              onClick={() => handleConfirmLinkBarcode(p)}
-                              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-black text-white hover:bg-indigo-500 shadow-md transition disabled:opacity-50 shrink-0"
-                            >
-                              <Link2 className="h-4 w-4" />
-                              <span>{isLinkingBarcode ? 'Vinculando...' : 'Vincular a esta peça'}</span>
-                            </button>
+                            {/* DOIS BOTÕES DE AÇÃO EXPLICITAMENTE SOLICITADOS PELO USUÁRIO */}
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+                              <button
+                                type="button"
+                                disabled={isLinkingBarcode}
+                                onClick={() => handleConfirmLinkBarcode(p)}
+                                title="Mantém os dados cadastrados, estoque e locação atuais, apenas vinculando o novo código de barras bipado"
+                                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-black text-white hover:bg-indigo-500 shadow-md transition disabled:opacity-50"
+                              >
+                                <Link2 className="h-4 w-4" />
+                                <span>{isLinkingBarcode ? 'Vinculando...' : '🔗 Apenas Vincular Código de Barras'}</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={isLinkingBarcode}
+                                onClick={() => handleOpenUpdateProductModal(p)}
+                                title="Atualiza o código de fábrica ou descrição da peça com os dados do bipe, mantendo locação física e estoque intocados"
+                                className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-black text-white hover:bg-emerald-500 shadow-md transition disabled:opacity-50"
+                              >
+                                <Edit3 className="h-4 w-4" />
+                                <span>✏️ Alterar com os Dados Novos</span>
+                              </button>
+                            </div>
                           </div>
                         ))}
                       </div>
@@ -1710,6 +1872,108 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
                 >
                   <Link2 className="h-3.5 w-3.5" />
                   <span>{isLinkingAltBarcode ? 'Vinculando...' : 'Confirmar Vínculo'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PARA ALTERAR PEÇA CADASTRADA COM OS DADOS DO BIPE */}
+      {isUpdateNewDataModalOpen && targetProductToUpdate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 p-5">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
+              <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                <Edit3 className="h-5 w-5 text-emerald-600" />
+                <span>Alterar Peça com Dados do Bipe</span>
+              </h3>
+              <button
+                onClick={() => setIsUpdateNewDataModalOpen(false)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Preserved Data Notice */}
+            <div className="mb-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 p-3 border border-emerald-200 dark:border-emerald-800">
+              <div className="flex items-center gap-2 text-xs font-black text-emerald-900 dark:text-emerald-200">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span>A locação física e o estoque desta peça serão 100% preservados:</span>
+              </div>
+              <div className="mt-2 grid grid-cols-2 gap-2 text-xs font-mono">
+                <div className="bg-white/80 dark:bg-slate-800/80 p-2 rounded border border-emerald-100 dark:border-emerald-900">
+                  <span className="text-[10px] text-slate-500 uppercase block font-sans font-bold">Locação Atual (Intocada)</span>
+                  <span className="font-bold text-amber-700 dark:text-amber-400">
+                    {targetProductToUpdate.locacao || (targetProductToUpdate.corredor ? `C-${targetProductToUpdate.corredor}-B-${targetProductToUpdate.baia}-N-${targetProductToUpdate.nivel}` : 'Sem locação')}
+                  </span>
+                </div>
+                <div className="bg-white/80 dark:bg-slate-800/80 p-2 rounded border border-emerald-100 dark:border-emerald-900">
+                  <span className="text-[10px] text-slate-500 uppercase block font-sans font-bold">Estoque Atual (Intocado)</span>
+                  <span className="font-bold text-emerald-700 dark:text-emerald-300">
+                    {targetProductToUpdate.quantidade} un
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveProductUpdate} className="space-y-3.5">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Código de Barras Novo (EAN do Bipe):
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={updateNewCodigoBarras}
+                  onChange={e => setUpdateNewCodigoBarras(e.target.value.trim())}
+                  className="w-full rounded-xl border border-slate-300 bg-white dark:bg-slate-800 px-3.5 py-2 font-mono text-sm font-bold text-slate-900 dark:text-white focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Código de Fábrica / Referência da Peça:
+                </label>
+                <input
+                  type="text"
+                  value={updateNewCodigoFabrica}
+                  onChange={e => setUpdateNewCodigoFabrica(e.target.value.trim())}
+                  placeholder="Ex: 13228 ou part number..."
+                  className="w-full rounded-xl border border-slate-300 bg-white dark:bg-slate-800 px-3.5 py-2 font-mono text-sm font-bold text-slate-900 dark:text-white focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Descrição / Nome da Peça:
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={updateNewDescricao}
+                  onChange={e => setUpdateNewDescricao(e.target.value)}
+                  placeholder="Ex: PISTÃO / ANÉIS / CASQUILHO..."
+                  className="w-full rounded-xl border border-slate-300 bg-white dark:bg-slate-800 px-3.5 py-2 text-sm font-bold text-slate-900 dark:text-white focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsUpdateNewDataModalOpen(false)}
+                  className="rounded-xl bg-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-300"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingProductUpdate || !updateNewDescricao.trim()}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-5 py-2 text-xs font-black text-white hover:bg-emerald-500 disabled:opacity-50 shadow-md"
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  <span>{isSavingProductUpdate ? 'Salvando...' : 'Confirmar e Atualizar Peça'}</span>
                 </button>
               </div>
             </form>
