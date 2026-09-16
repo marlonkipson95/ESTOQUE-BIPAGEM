@@ -121,9 +121,11 @@ export default function App() {
       if (!authSession.isAuthenticated) return;
       setIncomingScannedCode(code);
 
-      // Route intelligence: if user is in consulta, set search term; otherwise direct to bipagem
+      // Route intelligence
       if (activeModule === 'consulta') {
         setConsultaFilters(prev => ({ ...prev, searchTerm: code }));
+      } else if (activeModule === 'orcamento') {
+        // Stay in orcamento to add the item
       } else {
         setActiveModule('bipagem');
       }
