@@ -215,6 +215,12 @@ export const OrcamentoView: React.FC<OrcamentoViewProps> = ({
     }
   };
 
+  const getProductCode = (produtoId?: string) => {
+    if (!produtoId) return null;
+    const p = products.find(prod => prod.id === produtoId);
+    return p ? (p.codigo_fabrica || p.codigo_atual) : null;
+  };
+
   const formatCurrency = (v: number) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v);
   };
@@ -423,6 +429,9 @@ export const OrcamentoView: React.FC<OrcamentoViewProps> = ({
                 (currentOrcamento.itens || []).map(item => (
                   <tr key={item.id} className="border-b border-slate-100 dark:border-slate-800/50 hover:bg-slate-50 dark:hover:bg-slate-800/30 print:border-slate-300">
                     <td className="p-3">
+                      {getProductCode(item.produto_id) && (
+                        <div className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400 mb-0.5">{getProductCode(item.produto_id)}</div>
+                      )}
                       <div className="font-bold text-sm text-slate-900 dark:text-white">{item.descricao}</div>
                     </td>
                     <td className="p-3 print:hidden">
@@ -476,7 +485,12 @@ export const OrcamentoView: React.FC<OrcamentoViewProps> = ({
             (currentOrcamento.itens || []).map(item => (
               <div key={item.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3 shadow-sm flex flex-col gap-3">
                 <div className="flex justify-between items-start gap-2">
-                  <div className="font-bold text-sm text-slate-900 dark:text-white">{item.descricao}</div>
+                  <div>
+                    {getProductCode(item.produto_id) && (
+                      <div className="text-xs font-mono font-bold text-indigo-600 dark:text-indigo-400 mb-0.5">{getProductCode(item.produto_id)}</div>
+                    )}
+                    <div className="font-bold text-sm text-slate-900 dark:text-white leading-tight">{item.descricao}</div>
+                  </div>
                   <button onClick={() => removeItem(item.id)} className="text-slate-400 hover:text-red-500 p-1 shrink-0">
                     <Trash2 className="h-4 w-4" />
                   </button>
