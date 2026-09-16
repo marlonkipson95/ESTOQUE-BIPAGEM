@@ -241,12 +241,13 @@ class StorageService {
     const products = this.getProducts();
     const codeHistory = this.getCodeHistory();
 
-    // ETAPA 1: Pesquisar código de barras atual, código interno atual, código de fábrica ou códigos alternativos
+    // ETAPA 1: Pesquisar código de barras atual, código interno atual, código de fábrica, códigos alternativos ou códigos vinculados ativos
     const exactCurrentMatch = products.find(
       p => matchesCode(p.codigo_barras_atual) ||
            matchesCode(p.codigo_atual) ||
            matchesCode(p.codigo_fabrica) ||
-           (Array.isArray(p.codigos_alternativos) && p.codigos_alternativos.some(alt => matchesCode(alt)))
+           (Array.isArray(p.codigos_alternativos) && p.codigos_alternativos.some(alt => matchesCode(alt))) ||
+           codeHistory.some(h => h.produto_id === p.id && h.ativo && matchesCode(h.codigo))
     );
 
     if (exactCurrentMatch) {
@@ -339,7 +340,8 @@ class StorageService {
       p => matchesCode(p.codigo_barras_atual) ||
            matchesCode(p.codigo_atual) ||
            matchesCode(p.codigo_fabrica) ||
-           (Array.isArray(p.codigos_alternativos) && p.codigos_alternativos.some(c => matchesCode(c)))
+           (Array.isArray(p.codigos_alternativos) && p.codigos_alternativos.some(c => matchesCode(c))) ||
+           codeHistory.some(h => h.produto_id === p.id && h.ativo && matchesCode(h.codigo))
     );
     if (current) return current;
 
@@ -464,6 +466,79 @@ class StorageService {
     });
 
     return { success: true, product: currentProduct, message: 'Código atualizado com sucesso' };
+  }
+
+  // --- Vínculo de Múltiplos Códigos de Barras ao mesmo Produto (sem apagar anteriores) ---
+  vincularCodigoBarras(
+    productId: string,
+    newBarcode: string,
+    motivo: string = 'Código de barras adicional vinculado',
+    userName: string = 'Operador Almoxarifado'
+  ): { success: boolean; product?: Product; error?: string; message?: string } {
+    const products = this.getProducts();
+    const productIndex = products.findIndex(p => p.id === productId);
+    if (productIndex === -1) {
+      return { success: false, error: 'Produto não encontrado' };
+    }
+
+    const currentProduct = products[productIndex];
+    const cleanCode = newBarcode.trim();
+    if (!cleanCode) {
+      return { success: false, error: 'O código de barras não pode ser vazio' };
+    }
+
+    let currentAlts: string[] = [];
+    if (Array.isArray(currentProduct.codigos_alternativos)) {
+      currentAlts = [...currentProduct.codigos_alternativos];
+    } else if (typeof currentProduct.codigos_alternativos === 'string' && currentProduct.codigos_alternativos) {
+      currentAlts = (currentProduct.codigos_alternativos as string).split(/[,;\n]/).map(s => s.trim()).filter(Boolean);
+    }
+
+    if (
+      currentProduct.codigo_barras_atual === cleanCode ||
+      currentAlts.includes(cleanCode)
+    ) {
+      return { success: true, product: currentProduct, message: 'Este código já está vinculado a esta peça.' };
+    }
+
+    const now = new Date().toISOString();
+    if (!currentProduct.codigo_barras_atual) {
+      currentProduct.codigo_barras_atual = cleanCode;
+    } else {
+      currentAlts.push(cleanCode);
+      currentProduct.codigos_alternativos = currentAlts;
+    }
+    currentProduct.atualizado_em = now;
+
+    products[productIndex] = currentProduct;
+    this.saveProducts(products);
+
+    const codeHistory = this.getCodeHistory();
+    codeHistory.unshift({
+      id: `HIST-${Date.now()}-EAN-ALT`,
+      produto_id: productId,
+      tipo: 'codigo_barras',
+      codigo: cleanCode,
+      ativo: true,
+      criado_em: now,
+      motivo,
+    });
+    this.saveCodeHistory(codeHistory);
+
+    this.addMovement({
+      produto_id: productId,
+      tipo: 'alteracao_codigo',
+      quantidade: currentProduct.quantidade,
+      quantidade_anterior: currentProduct.quantidade,
+      detalhes: `Código de barras adicional "${cleanCode}" vinculado à peça. Motivo: ${motivo}`,
+      usuario: userName,
+    });
+
+    apiService.vincularCodigo(productId, cleanCode, 'codigo_barras', motivo).catch(err => {
+      console.warn('[StorageService] Vínculo de código no backend adiado:', err.message);
+    });
+
+    return { success: true, product: currentProduct, message: 'Código de barras vinculado com sucesso!' };
   }
 
   addProduct(productData: Partial<Product> & { descricao: string }): Product {

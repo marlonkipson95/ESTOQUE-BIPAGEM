@@ -154,6 +154,27 @@ class ApiService {
     return await res.json();
   }
 
+  // POST /api/produtos/:id/vincular-codigo - Vínculo de múltiplos códigos sem apagar anteriores
+  async vincularCodigo(
+    id: string,
+    codigo: string,
+    tipo: 'codigo_barras' | 'codigo_produto' | 'codigo_fabrica' = 'codigo_barras',
+    motivo: string = 'Código de barras adicional vinculado'
+  ): Promise<{ success: boolean; product: Product; message: string }> {
+    const res = await fetch(`${this.baseUrl}/produtos/${encodeURIComponent(id)}/vincular-codigo`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ codigo, tipo, motivo }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Falha ao vincular código ao produto');
+    }
+
+    return await res.json();
+  }
+
   async deleteProduct(id: string): Promise<{ success: boolean; message: string }> {
     const res = await fetch(`${this.baseUrl}/produtos/${encodeURIComponent(id)}`, {
       method: 'DELETE',

@@ -80,10 +80,15 @@ async function loadProductExtras(client: any, product: any) {
 
   if (typeof product.codigos_alternativos === 'string') {
     product.codigos_alternativos = product.codigos_alternativos
+      .replace(/[\[\]"']/g, '')
       .split(/[,;\n]/)
       .map((s: string) => s.trim())
       .filter(Boolean);
-  } else if (!Array.isArray(product.codigos_alternativos)) {
+  } else if (Array.isArray(product.codigos_alternativos)) {
+    product.codigos_alternativos = product.codigos_alternativos
+      .map((s: any) => String(s).replace(/[\[\]"']/g, '').trim())
+      .filter(Boolean);
+  } else {
     product.codigos_alternativos = [];
   }
   product.custo_unitario = Number(product.custo_unitario) || 0;
@@ -122,10 +127,15 @@ function loadMemoryProductExtras(product: any) {
 
   if (typeof product.codigos_alternativos === 'string') {
     product.codigos_alternativos = product.codigos_alternativos
+      .replace(/[\[\]"']/g, '')
       .split(/[,;\n]/)
       .map((s: string) => s.trim())
       .filter(Boolean);
-  } else if (!Array.isArray(product.codigos_alternativos)) {
+  } else if (Array.isArray(product.codigos_alternativos)) {
+    product.codigos_alternativos = product.codigos_alternativos
+      .map((s: any) => String(s).replace(/[\[\]"']/g, '').trim())
+      .filter(Boolean);
+  } else {
     product.codigos_alternativos = [];
   }
   return product;
@@ -214,23 +224,33 @@ apiRouter.post('/produtos/scan', async (req: Request, res: Response) => {
     try {
       const client = await pool.connect();
       try {
-        // ETAPA 1: Código atual (código de barras, código interno ou código de fábrica direto)
+        // ETAPA 1: Código atual (código de barras, código interno, código de fábrica, códigos alternativos ou códigos vinculados ativos)
         const etapa1 = await client.query(`
           SELECT * FROM produtos 
           WHERE UPPER(codigo_barras_atual) = UPPER($1) 
              OR UPPER(codigo_atual) = UPPER($1)
              OR UPPER(codigo_fabrica) = UPPER($1)
+             OR codigos_alternativos ILIKE '%' || $1 || '%'
              OR (LENGTH($2) >= 4 AND (
                   REPLACE(REPLACE(REPLACE(codigo_barras_atual, ' ', ''), '-', ''), '.', '') = $2
                OR REPLACE(REPLACE(REPLACE(codigo_atual, ' ', ''), '-', ''), '.', '') = $2
                OR REPLACE(REPLACE(REPLACE(codigo_fabrica, ' ', ''), '-', ''), '.', '') = $2
+               OR REPLACE(REPLACE(REPLACE(codigos_alternativos, ' ', ''), '-', ''), '.', '') LIKE '%' || $2 || '%'
              ))
+             OR id IN (
+               SELECT produto_id FROM codigos_produto 
+               WHERE ativo = true AND (
+                 UPPER(codigo) = UPPER($1) OR 
+                 (LENGTH($2) >= 4 AND REPLACE(REPLACE(REPLACE(codigo, ' ', ''), '-', ''), '.', '') = $2)
+               )
+             )
           LIMIT 1
         `, [cleanCode, normalizedCode]);
 
         if (etapa1.rows.length > 0) {
           const product = await loadProductExtras(client, etapa1.rows[0]);
-          const isBarcode = product.codigo_barras_atual?.replace(/[\s\.-]/g, '').toUpperCase() === normalizedCode.toUpperCase();
+          const isBarcode = product.codigo_barras_atual?.replace(/[\s\.-]/g, '').toUpperCase() === normalizedCode.toUpperCase() ||
+                            (Array.isArray(product.codigos_alternativos) && product.codigos_alternativos.some((alt: string) => alt?.replace(/[\s\.-]/g, '').toUpperCase() === normalizedCode.toUpperCase()));
           const isFactory = product.codigo_fabrica?.replace(/[\s\.-]/g, '').toUpperCase() === normalizedCode.toUpperCase();
           const activeCodeType = isBarcode ? 'codigo_barras' : (isFactory ? 'codigo_fabrica' : 'codigo_produto');
 
@@ -316,10 +336,13 @@ apiRouter.post('/produtos/scan', async (req: Request, res: Response) => {
   const p1 = memoryProducts.find(
     p => p.codigo_barras_atual?.toUpperCase() === cleanCode.toUpperCase() ||
          p.codigo_atual?.toUpperCase() === cleanCode.toUpperCase() ||
-         p.codigo_fabrica?.toUpperCase() === cleanCode.toUpperCase()
+         p.codigo_fabrica?.toUpperCase() === cleanCode.toUpperCase() ||
+         (Array.isArray(p.codigos_alternativos) && p.codigos_alternativos.some(alt => alt?.toUpperCase() === cleanCode.toUpperCase())) ||
+         memoryCodeHistory.some(h => h.produto_id === p.id && h.ativo && h.codigo?.toUpperCase() === cleanCode.toUpperCase())
   );
   if (p1) {
-    const isBarcode = p1.codigo_barras_atual?.toUpperCase() === cleanCode.toUpperCase();
+    const isBarcode = p1.codigo_barras_atual?.toUpperCase() === cleanCode.toUpperCase() ||
+                      (Array.isArray(p1.codigos_alternativos) && p1.codigos_alternativos.some(alt => alt?.toUpperCase() === cleanCode.toUpperCase()));
     const isFactory = p1.codigo_fabrica?.toUpperCase() === cleanCode.toUpperCase();
     return res.json({
       status: 'found_current',
@@ -999,6 +1022,132 @@ apiRouter.post('/produtos/:id/codigo', async (req: Request, res: Response) => {
   res.json({
     product: memoryProducts[prodIdx],
     message: 'Código atualizado com sucesso no histórico.',
+  });
+});
+
+// ==========================================
+// 8b. POST /api/produtos/:id/vincular-codigo (Vincular Código de Barras Adicional sem Apagar Anteriores)
+// ==========================================
+apiRouter.post('/produtos/:id/vincular-codigo', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { codigo, tipo = 'codigo_barras', motivo = 'Vínculo de código de barras adicional' } = req.body;
+
+  if (!codigo || !codigo.trim()) {
+    return res.status(400).json({ error: 'O código a vincular é obrigatório.' });
+  }
+
+  const cleanCode = codigo.trim();
+  const pool = getDbPool();
+
+  if (pool) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const prodRes = await client.query('SELECT * FROM produtos WHERE id = $1', [id]);
+      if (prodRes.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Produto não encontrado' });
+      }
+      const prod = prodRes.rows[0];
+
+      // Verificar se já possui esse código como atual
+      const isAlreadyMain = prod.codigo_barras_atual?.trim().toUpperCase() === cleanCode.toUpperCase() ||
+                            prod.codigo_atual?.trim().toUpperCase() === cleanCode.toUpperCase() ||
+                            prod.codigo_fabrica?.trim().toUpperCase() === cleanCode.toUpperCase();
+
+      let currentAlts: string[] = [];
+      if (typeof prod.codigos_alternativos === 'string' && prod.codigos_alternativos.trim()) {
+        currentAlts = prod.codigos_alternativos.split(/[,;\n]/).map((s: string) => s.trim()).filter(Boolean);
+      } else if (Array.isArray(prod.codigos_alternativos)) {
+        currentAlts = prod.codigos_alternativos;
+      }
+
+      const isAlreadyInAlts = currentAlts.some(c => c.toUpperCase() === cleanCode.toUpperCase());
+
+      if (isAlreadyMain || isAlreadyInAlts) {
+        await client.query('COMMIT');
+        const fullProd = await loadProductExtras(client, prod);
+        return res.json({
+          success: true,
+          product: fullProd,
+          message: 'Este código já está vinculado a esta peça.',
+        });
+      }
+
+      // Se o produto não tinha código de barras principal, define como principal
+      let updateSql = '';
+      let updateParams: any[] = [];
+      if (!prod.codigo_barras_atual || !prod.codigo_barras_atual.trim()) {
+        updateSql = 'UPDATE produtos SET codigo_barras_atual = $1, atualizado_em = NOW() WHERE id = $2 RETURNING *';
+        updateParams = [cleanCode, id];
+      } else {
+        // Se já tinha código de barras, adiciona na lista de codigos_alternativos sem sobrescrever o anterior
+        const newAlts = [...currentAlts, cleanCode];
+        updateSql = 'UPDATE produtos SET codigos_alternativos = $1, atualizado_em = NOW() WHERE id = $2 RETURNING *';
+        updateParams = [newAlts.join(', '), id];
+      }
+
+      const updated = await client.query(updateSql, updateParams);
+
+      // Inserir em codigos_produto como ativo (mantendo os anteriores ativos também!)
+      await client.query(`
+        INSERT INTO codigos_produto (produto_id, tipo, codigo, ativo, motivo)
+        VALUES ($1, $2, $3, true, $4)
+      `, [id, tipo, cleanCode, motivo]);
+
+      // Registrar auditoria
+      await client.query(`
+        INSERT INTO historico_alteracoes (produto_id, campo, valor_anterior, valor_novo, motivo)
+        VALUES ($1, 'codigos_alternativos', $2, $3, $4)
+      `, [id, prod.codigo_barras_atual || '', cleanCode, motivo]);
+
+      await client.query('COMMIT');
+
+      const finalProduct = await loadProductExtras(client, updated.rows[0]);
+      return res.json({
+        success: true,
+        product: finalProduct,
+        message: 'Código de barras vinculado com sucesso à mercadoria!',
+      });
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      console.error('[API] Erro ao vincular código:', err.message);
+      return res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  }
+
+  // Fallback memory
+  const prodIdx = memoryProducts.findIndex(p => p.id === id);
+  if (prodIdx === -1) return res.status(404).json({ error: 'Produto não encontrado' });
+
+  const pMem = memoryProducts[prodIdx];
+  if (!pMem.codigo_barras_atual) {
+    pMem.codigo_barras_atual = cleanCode;
+  } else {
+    if (!Array.isArray(pMem.codigos_alternativos)) pMem.codigos_alternativos = [];
+    if (!pMem.codigos_alternativos.includes(cleanCode)) {
+      pMem.codigos_alternativos.push(cleanCode);
+    }
+  }
+  pMem.atualizado_em = new Date().toISOString();
+
+  memoryCodeHistory.unshift({
+    id: memoryCodeHistory.length + 1,
+    produto_id: id,
+    tipo: tipo as any,
+    codigo: cleanCode,
+    ativo: true,
+    criado_em: new Date().toISOString(),
+    motivo,
+  });
+
+  return res.json({
+    success: true,
+    product: loadMemoryProductExtras(pMem),
+    message: 'Código de barras vinculado com sucesso à mercadoria!',
   });
 });
 

@@ -17,6 +17,8 @@ import {
   Layers,
   Plus,
   Save,
+  Link2,
+  Search,
 } from 'lucide-react';
 import { Product, ScanResult } from '../../types';
 import { storageService } from '../../services/storageService';
@@ -77,6 +79,123 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
   const [editScannedSourceCode, setEditScannedSourceCode] = useState('');
   const [isSavingDescricao, setIsSavingDescricao] = useState(false);
   const [editDataSuccessMsg, setEditDataSuccessMsg] = useState('');
+
+  // Vinculação de código de barras a produto existente
+  const [notFoundTab, setNotFoundTab] = useState<'link' | 'new'>('link');
+  const [searchLinkTerm, setSearchLinkTerm] = useState('');
+  const [searchLinkResults, setSearchLinkResults] = useState<Product[]>([]);
+  const [isSearchingLink, setIsSearchingLink] = useState(false);
+  const [isLinkingBarcode, setIsLinkingBarcode] = useState(false);
+
+  // Modal para adicionar código de barras adicional ao produto já aberto
+  const [isAddAltBarcodeModalOpen, setIsAddAltBarcodeModalOpen] = useState(false);
+  const [altBarcodeToLink, setAltBarcodeToLink] = useState('');
+  const [isLinkingAltBarcode, setIsLinkingAltBarcode] = useState(false);
+
+  const handleSearchLinkProducts = async (term: string) => {
+    setSearchLinkTerm(term);
+    const clean = term.trim();
+    if (!clean || clean.length < 2) {
+      setSearchLinkResults([]);
+      return;
+    }
+
+    setIsSearchingLink(true);
+    try {
+      const res = await apiService.getProducts({ search: clean, limit: '8' });
+      if (res && Array.isArray(res.products) && res.products.length > 0) {
+        setSearchLinkResults(res.products);
+      } else {
+        const localProds = storageService.getProducts();
+        const lower = clean.toLowerCase();
+        const filtered = localProds.filter(p => 
+          (p.codigo_atual && p.codigo_atual.toLowerCase().includes(lower)) ||
+          (p.codigo_fabrica && p.codigo_fabrica.toLowerCase().includes(lower)) ||
+          (p.descricao && p.descricao.toLowerCase().includes(lower)) ||
+          (p.codigo_barras_atual && p.codigo_barras_atual.toLowerCase().includes(lower)) ||
+          (Array.isArray(p.codigos_alternativos) && p.codigos_alternativos.some(c => c.toLowerCase().includes(lower)))
+        ).slice(0, 8);
+        setSearchLinkResults(filtered);
+      }
+    } catch {
+      const localProds = storageService.getProducts();
+      const lower = clean.toLowerCase();
+      const filtered = localProds.filter(p => 
+        (p.codigo_atual && p.codigo_atual.toLowerCase().includes(lower)) ||
+        (p.codigo_fabrica && p.codigo_fabrica.toLowerCase().includes(lower)) ||
+        (p.descricao && p.descricao.toLowerCase().includes(lower)) ||
+        (p.codigo_barras_atual && p.codigo_barras_atual.toLowerCase().includes(lower)) ||
+        (Array.isArray(p.codigos_alternativos) && p.codigos_alternativos.some(c => c.toLowerCase().includes(lower)))
+      ).slice(0, 8);
+      setSearchLinkResults(filtered);
+    } finally {
+      setIsSearchingLink(false);
+    }
+  };
+
+  const handleConfirmLinkBarcode = async (targetProduct: Product) => {
+    if (!scanResult?.code) return;
+    const barcodeToLink = scanResult.code.trim();
+    setIsLinkingBarcode(true);
+
+    try {
+      const apiRes = await apiService.vincularCodigo(targetProduct.id, barcodeToLink);
+      const storageRes = storageService.vincularCodigoBarras(targetProduct.id, barcodeToLink);
+
+      const finalProduct = apiRes?.product || storageRes?.product || targetProduct;
+
+      beepService.playSuccess();
+      setLocationSuccessMsg(`✓ Código ${barcodeToLink} vinculado com sucesso à peça ${finalProduct.codigo_fabrica || finalProduct.codigo_atual}! Locação física exibida.`);
+      setTimeout(() => setLocationSuccessMsg(''), 6000);
+
+      setScanResult({
+        code: barcodeToLink,
+        status: 'found_current',
+        product: finalProduct,
+        message: 'Produto localizado via código de barras vinculado!',
+        timestamp: new Date().toISOString(),
+      });
+      setSearchLinkTerm('');
+      setSearchLinkResults([]);
+    } catch (err: any) {
+      beepService.playError();
+      alert('Erro ao vincular código: ' + (err.message || 'Falha de conexão'));
+    } finally {
+      setIsLinkingBarcode(false);
+    }
+  };
+
+  const handleAddAltBarcodeFromCard = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!scanResult?.product?.id || !altBarcodeToLink.trim()) return;
+
+    const barcode = altBarcodeToLink.trim();
+    setIsLinkingAltBarcode(true);
+    try {
+      const apiRes = await apiService.vincularCodigo(scanResult.product.id, barcode);
+      const storageRes = storageService.vincularCodigoBarras(scanResult.product.id, barcode);
+
+      const finalProduct = apiRes?.product || storageRes?.product || {
+        ...scanResult.product,
+        codigos_alternativos: [...(scanResult.product.codigos_alternativos || []), barcode],
+      };
+
+      beepService.playSuccess();
+      setScanResult({
+        ...scanResult,
+        product: finalProduct,
+      });
+      setLocationSuccessMsg(`Código adicional ${barcode} vinculado com sucesso a esta peça!`);
+      setTimeout(() => setLocationSuccessMsg(''), 5000);
+      setAltBarcodeToLink('');
+      setIsAddAltBarcodeModalOpen(false);
+    } catch (err: any) {
+      beepService.playError();
+      alert('Erro ao vincular código adicional: ' + (err.message || 'Falha de conexão'));
+    } finally {
+      setIsLinkingAltBarcode(false);
+    }
+  };
 
   const formatPriceOnlyNumber = (val?: number) => {
     if (val === undefined || val === null || isNaN(val)) return '0,00';
@@ -292,10 +411,15 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
           beepService.playSuccess();
         } else if (localResult.status === 'not_found') {
           beepService.playError();
-          // Pre-populate inline description if brand is recognized
           const parsed = parseScannedLabel(code);
           setInlineDescricao(parsed.descricao_sugerida || (parsed.fabricante ? `PEÇA ${parsed.fabricante}` : ''));
-          setTimeout(() => inlineCorredorRef.current?.focus(), 150);
+          setNotFoundTab('link');
+          if (parsed.codigo_fabrica) {
+            handleSearchLinkProducts(parsed.codigo_fabrica);
+          } else {
+            setSearchLinkTerm('');
+            setSearchLinkResults([]);
+          }
         } else {
           beepService.playWarning();
         }
@@ -310,7 +434,13 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
         beepService.playError();
         const parsed = parseScannedLabel(code);
         setInlineDescricao(parsed.descricao_sugerida || (parsed.fabricante ? `PEÇA ${parsed.fabricante}` : ''));
-        setTimeout(() => inlineCorredorRef.current?.focus(), 150);
+        setNotFoundTab('link');
+        if (parsed.codigo_fabrica) {
+          handleSearchLinkProducts(parsed.codigo_fabrica);
+        } else {
+          setSearchLinkTerm('');
+          setSearchLinkResults([]);
+        }
       } else {
         beepService.playWarning();
       }
@@ -861,7 +991,20 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
               {/* Informações Complementares dos Códigos e Estoque */}
               <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                 <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
-                  <span className="block text-slate-400 font-medium">Cód. Barras (EAN)</span>
+                  <div className="flex items-center justify-between">
+                    <span className="block text-slate-400 font-medium">Cód. Barras</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAltBarcodeToLink('');
+                        setIsAddAltBarcodeModalOpen(true);
+                      }}
+                      className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-0.5"
+                      title="Vincular outro código de barras a esta peça"
+                    >
+                      <Plus className="h-3 w-3" /> + Vincular
+                    </button>
+                  </div>
                   <strong className="font-mono text-sm text-slate-900 dark:text-white truncate block mt-0.5">
                     {scanResult.product.codigo_barras_atual || '—'}
                   </strong>
@@ -889,15 +1032,28 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
                 </div>
               </div>
 
-              {/* CÓDIGOS ALTERNATIVOS */}
+              {/* CÓDIGOS ALTERNATIVOS / OUTROS CÓDIGOS DE BARRAS VINCULADOS */}
               {Array.isArray(scanResult.product.codigos_alternativos) && scanResult.product.codigos_alternativos.length > 0 && (
-                <div className="mt-3 flex flex-wrap items-center gap-1.5 text-xs">
-                  <span className="font-bold text-slate-500">Códigos Alternativos:</span>
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-xs p-3 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200 dark:border-indigo-900/60">
+                  <span className="font-black text-indigo-900 dark:text-indigo-200 flex items-center gap-1.5">
+                    <Barcode className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                    Outros Códigos Vinculados a esta peça:
+                  </span>
                   {scanResult.product.codigos_alternativos.map((altCode, i) => (
-                    <span key={i} className="rounded-md bg-slate-100 px-2 py-0.5 font-mono text-[11px] font-semibold text-slate-700 border border-slate-200 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300">
+                    <span key={i} className="rounded-lg bg-white px-2.5 py-1 font-mono text-xs font-bold text-indigo-700 border border-indigo-200 dark:bg-slate-900 dark:border-indigo-800 dark:text-indigo-300 shadow-sm">
                       {altCode}
                     </span>
                   ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAltBarcodeToLink('');
+                      setIsAddAltBarcodeModalOpen(true);
+                    }}
+                    className="ml-auto text-xs font-bold text-indigo-600 hover:underline dark:text-indigo-400 flex items-center gap-1"
+                  >
+                    <Plus className="h-3.5 w-3.5" /> Vincular mais um
+                  </button>
                 </div>
               )}
 
@@ -1015,10 +1171,10 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
                   </div>
                   <div>
                     <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-[10px] sm:text-xs font-black uppercase tracking-wider text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300 dark:border-amber-800">
-                      CÓDIGO NÃO LOCALIZADO NO ESTOQUE
+                      CÓDIGO NÃO LOCALIZADO DIRETAMENTE
                     </span>
                     <h2 className="text-lg md:text-xl font-black text-slate-900 dark:text-white mt-0.5">
-                      NOVA MERCADORIA: DEFINIR LOCAÇÃO
+                      VINCULAR A PEÇA OU DEFINIR LOCAÇÃO
                     </h2>
                   </div>
                 </div>
@@ -1041,13 +1197,13 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
 
                     <div className="grid grid-cols-2 gap-2 text-xs font-mono">
                       <div className="rounded-lg bg-white p-2 border border-indigo-100 dark:bg-slate-800 dark:border-indigo-900">
-                        <span className="block text-[10px] text-slate-500 uppercase font-sans font-semibold">Cód. Barras (EAN)</span>
+                        <span className="block text-[10px] text-slate-500 uppercase font-sans font-semibold">Cód. Barras (Bipado)</span>
                         <span className="font-bold text-slate-900 dark:text-white truncate block">
-                          {parsed.codigo_barras || '—'}
+                          {parsed.codigo_barras || scanResult.code}
                         </span>
                       </div>
                       <div className="rounded-lg bg-white p-2 border border-indigo-100 dark:bg-slate-800 dark:border-indigo-900">
-                        <span className="block text-[10px] text-slate-500 uppercase font-sans font-semibold">Cód. Fábrica</span>
+                        <span className="block text-[10px] text-slate-500 uppercase font-sans font-semibold">Cód. Fábrica Sugerido</span>
                         <span className="font-bold text-slate-900 dark:text-white truncate block">
                           {parsed.codigo_fabrica || '—'}
                         </span>
@@ -1063,91 +1219,223 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
                 </div>
               )}
 
-              {/* INLINE REGISTRATION FORM: OPERATOR ONLY FILLS LOCATION! */}
-              <form onSubmit={handleInlineRegister} className="mt-5 space-y-4">
-                <div className="rounded-2xl border-2 border-amber-500 bg-amber-50/60 p-4 dark:bg-amber-950/20 dark:border-amber-600">
-                  <label className="block text-xs font-black uppercase tracking-wider text-amber-900 dark:text-amber-300 mb-2">
-                    Informe a Locação Física (Corredor, Baia, Nível) *
-                  </label>
-
-                  <div className="grid grid-cols-3 gap-3 text-center">
-                    <div>
-                      <span className="block text-[11px] font-black uppercase text-slate-700 dark:text-slate-300 mb-1">
-                        Corredor *
-                      </span>
-                      <input
-                        ref={inlineCorredorRef}
-                        type="text"
-                        value={inlineCorredor}
-                        onChange={e => setInlineCorredor(e.target.value.toUpperCase())}
-                        placeholder="Ex: 02"
-                        required
-                        className="w-full rounded-xl border-2 border-amber-400 bg-white px-2 py-2.5 text-center font-mono text-lg font-black text-slate-900 placeholder-slate-300 focus:border-amber-600 focus:outline-none dark:bg-slate-800 dark:text-white"
-                      />
-                    </div>
-
-                    <div>
-                      <span className="block text-[11px] font-black uppercase text-slate-700 dark:text-slate-300 mb-1">
-                        Baia *
-                      </span>
-                      <input
-                        type="text"
-                        value={inlineBaia}
-                        onChange={e => setInlineBaia(e.target.value.toUpperCase())}
-                        placeholder="Ex: B04"
-                        required
-                        className="w-full rounded-xl border-2 border-emerald-400 bg-white px-2 py-2.5 text-center font-mono text-lg font-black text-slate-900 placeholder-slate-300 focus:border-emerald-600 focus:outline-none dark:bg-slate-800 dark:text-white"
-                      />
-                    </div>
-
-                    <div>
-                      <span className="block text-[11px] font-black uppercase text-slate-700 dark:text-slate-300 mb-1">
-                        Nível *
-                      </span>
-                      <input
-                        type="text"
-                        value={inlineNivel}
-                        onChange={e => setInlineNivel(e.target.value.toUpperCase())}
-                        placeholder="Ex: 03"
-                        required
-                        className="w-full rounded-xl border-2 border-sky-400 bg-white px-2 py-2.5 text-center font-mono text-lg font-black text-slate-900 placeholder-slate-300 focus:border-sky-600 focus:outline-none dark:bg-slate-800 dark:text-white"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                    Descrição da Mercadoria (opcional)
-                  </label>
-                  <input
-                    type="text"
-                    value={inlineDescricao}
-                    onChange={e => setInlineDescricao(e.target.value)}
-                    placeholder="Ex: JUNTA, CABEÇOTE MOTOR (MWM)"
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                  />
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+              {/* OPÇÕES: VINCULAR A PRODUTO EXISTENTE OU CADASTRAR PEÇA NOVA */}
+              <div className="mt-5">
+                <div className="flex rounded-xl bg-slate-100 p-1 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                   <button
-                    type="submit"
-                    disabled={isRegisteringInline}
-                    className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white shadow-lg hover:bg-indigo-500 disabled:opacity-50 transition"
+                    type="button"
+                    onClick={() => setNotFoundTab('link')}
+                    className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-black transition flex items-center justify-center gap-2 ${
+                      notFoundTab === 'link'
+                        ? 'bg-indigo-600 text-white shadow-md'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
                   >
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span>{isRegisteringInline ? 'SALVANDO NO BANCO...' : 'SALVAR PRODUTO NA LOCAÇÃO'}</span>
+                    <Link2 className="h-4 w-4" />
+                    <span>1. Já Tem Cadastro? Vincular a Peça</span>
                   </button>
 
                   <button
                     type="button"
-                    onClick={() => onOpenNewProductWithCode(scanResult.code)}
-                    className="w-full sm:w-auto rounded-xl border border-slate-300 px-4 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition"
+                    onClick={() => setNotFoundTab('new')}
+                    className={`flex-1 py-2.5 px-3 rounded-lg text-xs font-black transition flex items-center justify-center gap-2 ${
+                      notFoundTab === 'new'
+                        ? 'bg-indigo-600 text-white shadow-md'
+                        : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                    }`}
                   >
-                    Cadastro Completo...
+                    <PlusCircle className="h-4 w-4" />
+                    <span>2. Peça Nova (Definir Locação)</span>
                   </button>
                 </div>
-              </form>
+
+                {/* TAB 1: VINCULAR A PEÇA JÁ CADASTRADA */}
+                {notFoundTab === 'link' && (
+                  <div className="mt-4 space-y-3 animate-fadeIn">
+                    <div className="rounded-xl bg-indigo-50/60 p-3 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-900">
+                      <p className="text-xs text-indigo-950 dark:text-indigo-200 font-semibold leading-relaxed">
+                        Se este item já está no estoque com outro código ou etiqueta, pesquise abaixo pelo <strong>Código de Fábrica</strong> (ex: <code className="bg-white dark:bg-slate-800 px-1 py-0.5 rounded font-mono font-bold">800064041100</code> ou <code className="bg-white dark:bg-slate-800 px-1 py-0.5 rounded font-mono font-bold">A14130</code>) ou pelo <strong>Nome da Peça</strong> para vincular este código de barras a ela.
+                      </p>
+                    </div>
+
+                    <div className="relative">
+                      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                      <input
+                        type="text"
+                        value={searchLinkTerm}
+                        onChange={e => handleSearchLinkProducts(e.target.value)}
+                        placeholder="Digite o código original, fábrica ou descrição para buscar..."
+                        className="w-full rounded-xl border-2 border-indigo-500/50 bg-white pl-10 pr-4 py-3 text-sm font-semibold text-slate-900 placeholder-slate-400 focus:border-indigo-600 focus:outline-none dark:bg-slate-800 dark:text-white"
+                      />
+                    </div>
+
+                    {isSearchingLink && (
+                      <p className="text-xs text-indigo-500 text-center py-2 animate-pulse font-bold">
+                        Buscando no estoque...
+                      </p>
+                    )}
+
+                    {searchLinkResults.length > 0 ? (
+                      <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
+                        {searchLinkResults.map(p => (
+                          <div
+                            key={p.id}
+                            className="p-3.5 rounded-xl border-2 border-slate-200 bg-slate-50 dark:bg-slate-800/90 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm hover:border-indigo-500 transition"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {p.codigo_fabrica && (
+                                  <span className="font-mono text-sm font-black text-indigo-600 dark:text-indigo-400 bg-white dark:bg-slate-900 px-2 py-0.5 rounded border border-indigo-200 dark:border-indigo-800">
+                                    {p.codigo_fabrica}
+                                  </span>
+                                )}
+                                <span className="font-mono text-xs font-bold text-slate-500">
+                                  ({p.codigo_atual})
+                                </span>
+                                <span className="text-[11px] font-black px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                                  {p.quantidade} un em estoque
+                                </span>
+                              </div>
+
+                              <p className="text-xs font-bold text-slate-800 dark:text-slate-200 mt-1 line-clamp-2">
+                                {p.descricao}
+                              </p>
+
+                              <div className="flex items-center gap-3 text-[11px] text-slate-500 mt-1.5 flex-wrap">
+                                <span className="flex items-center gap-1 font-bold text-amber-700 dark:text-amber-400">
+                                  <MapPin className="h-3 w-3" />
+                                  {p.locacao || (p.corredor ? `C-${p.corredor}-B-${p.baia}-N-${p.nivel}` : 'Sem locação física')}
+                                </span>
+                                {p.codigo_barras_atual && (
+                                  <span className="text-slate-400">
+                                    Cód. barras atual: <code className="font-mono font-semibold">{p.codigo_barras_atual}</code>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <button
+                              type="button"
+                              disabled={isLinkingBarcode}
+                              onClick={() => handleConfirmLinkBarcode(p)}
+                              className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-black text-white hover:bg-indigo-500 shadow-md transition disabled:opacity-50 shrink-0"
+                            >
+                              <Link2 className="h-4 w-4" />
+                              <span>{isLinkingBarcode ? 'Vinculando...' : 'Vincular a esta peça'}</span>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : searchLinkTerm.trim().length >= 2 && !isSearchingLink ? (
+                      <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-dashed border-slate-300 dark:border-slate-700 text-center">
+                        <p className="text-xs text-slate-500">
+                          Nenhum produto cadastrado encontrado com "{searchLinkTerm}".
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setNotFoundTab('new')}
+                          className="mt-2 text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline inline-flex items-center gap-1"
+                        >
+                          <PlusCircle className="h-3.5 w-3.5" />
+                          <span>Cadastrar como nova mercadoria no estoque</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-dashed border-slate-300 dark:border-slate-700 text-center text-xs text-slate-500">
+                        Digite acima o código de fábrica ou nome da peça para pesquisar.
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* TAB 2: CADASTRAR COMO PEÇA NOVA (INFORMAR LOCAÇÃO) */}
+                {notFoundTab === 'new' && (
+                  <form onSubmit={handleInlineRegister} className="mt-4 space-y-4 animate-fadeIn">
+                    <div className="rounded-2xl border-2 border-amber-500 bg-amber-50/60 p-4 dark:bg-amber-950/20 dark:border-amber-600">
+                      <label className="block text-xs font-black uppercase tracking-wider text-amber-900 dark:text-amber-300 mb-2">
+                        Informe a Locação Física (Corredor, Baia, Nível) *
+                      </label>
+
+                      <div className="grid grid-cols-3 gap-3 text-center">
+                        <div>
+                          <span className="block text-[11px] font-black uppercase text-slate-700 dark:text-slate-300 mb-1">
+                            Corredor *
+                          </span>
+                          <input
+                            ref={inlineCorredorRef}
+                            type="text"
+                            value={inlineCorredor}
+                            onChange={e => setInlineCorredor(e.target.value.toUpperCase())}
+                            placeholder="Ex: 02"
+                            required
+                            className="w-full rounded-xl border-2 border-amber-400 bg-white px-2 py-2.5 text-center font-mono text-lg font-black text-slate-900 placeholder-slate-300 focus:border-amber-600 focus:outline-none dark:bg-slate-800 dark:text-white"
+                          />
+                        </div>
+
+                        <div>
+                          <span className="block text-[11px] font-black uppercase text-slate-700 dark:text-slate-300 mb-1">
+                            Baia *
+                          </span>
+                          <input
+                            type="text"
+                            value={inlineBaia}
+                            onChange={e => setInlineBaia(e.target.value.toUpperCase())}
+                            placeholder="Ex: B04"
+                            required
+                            className="w-full rounded-xl border-2 border-emerald-400 bg-white px-2 py-2.5 text-center font-mono text-lg font-black text-slate-900 placeholder-slate-300 focus:border-emerald-600 focus:outline-none dark:bg-slate-800 dark:text-white"
+                          />
+                        </div>
+
+                        <div>
+                          <span className="block text-[11px] font-black uppercase text-slate-700 dark:text-slate-300 mb-1">
+                            Nível *
+                          </span>
+                          <input
+                            type="text"
+                            value={inlineNivel}
+                            onChange={e => setInlineNivel(e.target.value.toUpperCase())}
+                            placeholder="Ex: 03"
+                            required
+                            className="w-full rounded-xl border-2 border-sky-400 bg-white px-2 py-2.5 text-center font-mono text-lg font-black text-slate-900 placeholder-slate-300 focus:border-sky-600 focus:outline-none dark:bg-slate-800 dark:text-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                        Descrição da Mercadoria (opcional)
+                      </label>
+                      <input
+                        type="text"
+                        value={inlineDescricao}
+                        onChange={e => setInlineDescricao(e.target.value)}
+                        placeholder="Ex: JUNTA, CABEÇOTE MOTOR (MWM)"
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                      />
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+                      <button
+                        type="submit"
+                        disabled={isRegisteringInline}
+                        className="w-full sm:flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 py-3 text-sm font-bold text-white shadow-lg hover:bg-indigo-500 disabled:opacity-50 transition"
+                      >
+                        <CheckCircle2 className="h-4 w-4" />
+                        <span>{isRegisteringInline ? 'SALVANDO NO BANCO...' : 'SALVAR PRODUTO NA LOCAÇÃO'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => onOpenNewProductWithCode(scanResult.code)}
+                        className="w-full sm:w-auto rounded-xl border border-slate-300 px-4 py-3 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 transition"
+                      >
+                        Cadastro Completo...
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -1351,6 +1639,77 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
                 >
                   <Save className="h-3.5 w-3.5" />
                   <span>{isSavingDescricao ? 'Salvando...' : 'Salvar Alterações'}</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PARA VINCULAR CÓDIGO DE BARRAS ADICIONAL */}
+      {isAddAltBarcodeModalOpen && scanResult?.product && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-sm animate-fadeIn">
+          <div className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 shadow-2xl border border-slate-200 dark:border-slate-800 p-5">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3 mb-4">
+              <h3 className="text-base font-black text-slate-900 dark:text-white flex items-center gap-2">
+                <Link2 className="h-5 w-5 text-indigo-600" />
+                <span>Vincular Código de Barras Adicional</span>
+              </h3>
+              <button
+                onClick={() => setIsAddAltBarcodeModalOpen(false)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-slate-800"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="mb-4 rounded-xl bg-slate-50 dark:bg-slate-800/60 p-3 border border-slate-200 dark:border-slate-700">
+              <span className="block text-[11px] font-bold text-slate-400 uppercase">Mercadoria:</span>
+              <strong className="block text-xs text-slate-900 dark:text-white mt-0.5">
+                {scanResult.product.descricao}
+              </strong>
+              <div className="mt-1 flex items-center gap-2 text-[11px] text-slate-500 font-mono">
+                <span>Cód: {scanResult.product.codigo_fabrica || scanResult.product.codigo_atual}</span>
+                {scanResult.product.codigo_barras_atual && (
+                  <span>| EAN: {scanResult.product.codigo_barras_atual}</span>
+                )}
+              </div>
+            </div>
+
+            <form onSubmit={handleAddAltBarcodeFromCard} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
+                  Novo Código de Barras (EAN / Etiqueta):
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  required
+                  value={altBarcodeToLink}
+                  onChange={e => setAltBarcodeToLink(e.target.value.trim())}
+                  placeholder="Bipe ou digite o novo código..."
+                  className="w-full rounded-xl border-2 border-indigo-500 bg-white dark:bg-slate-800 px-3.5 py-2.5 font-mono text-base font-bold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                  O produto continuará respondendo pelo código anterior e também por este novo.
+                </p>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setIsAddAltBarcodeModalOpen(false)}
+                  className="rounded-xl bg-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-300 dark:bg-slate-800 dark:text-slate-300"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={isLinkingAltBarcode || !altBarcodeToLink.trim()}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-5 py-2 text-xs font-black text-white hover:bg-indigo-500 disabled:opacity-50 shadow"
+                >
+                  <Link2 className="h-3.5 w-3.5" />
+                  <span>{isLinkingAltBarcode ? 'Vinculando...' : 'Confirmar Vínculo'}</span>
                 </button>
               </div>
             </form>
