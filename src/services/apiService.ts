@@ -254,6 +254,39 @@ class ApiService {
 
     return await res.json();
   }
+
+  // =====================================
+  // ORÇAMENTOS
+  // =====================================
+
+  async getOrcamentos(): Promise<import('../types').Orcamento[]> {
+    const res = await fetch(`${this.baseUrl}/orcamentos`);
+    if (!res.ok) throw new Error('Falha ao listar orçamentos');
+    return await res.json();
+  }
+
+  async salvarOrcamento(orcamento: Partial<import('../types').Orcamento>): Promise<{ success: boolean; orcamento?: import('../types').Orcamento }> {
+    const res = await fetch(`${this.baseUrl}/orcamentos`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(orcamento),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Falha ao salvar orçamento');
+    }
+    return await res.json();
+  }
+
+  async excluirOrcamento(id: string): Promise<void> {
+    const res = await fetch(`${this.baseUrl}/orcamentos/${id}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Falha ao excluir orçamento');
+    }
+  }
 }
 
 export const apiService = new ApiService();

@@ -27,6 +27,7 @@ import { ConsultaView } from './components/consulta/ConsultaView';
 import { BipagemView } from './components/bipagem/BipagemView';
 import { ProdutosView } from './components/produtos/ProdutosView';
 import { ImportacaoView } from './components/importacao/ImportacaoView';
+import { OrcamentoView } from './components/orcamento/OrcamentoView';
 import { UsuariosView } from './components/usuarios/UsuariosView';
 import { ConfiguracoesView } from './components/configuracoes/ConfiguracoesView';
 
@@ -254,6 +255,15 @@ export default function App() {
                 setPrefilledBarcode('');
                 setIsNewProductModalOpen(true);
               }}
+            />
+          )}
+
+          {activeModule === 'orcamento' && (
+            <OrcamentoView 
+              products={products}
+              onOpenQuickScan={() => setIsCameraScannerOpen(true)}
+              externalScannedCode={incomingScannedCode}
+              onClearExternalScannedCode={() => setIncomingScannedCode('')}
             />
           )}
 

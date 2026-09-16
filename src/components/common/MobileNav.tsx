@@ -11,6 +11,7 @@ import {
   Users,
   LogOut,
   User,
+  Calculator,
 } from 'lucide-react';
 import { AppModule, SystemUser } from '../../types';
 
@@ -39,7 +40,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
     { id: 'bipagem', label: 'Bipar', icon: Barcode },
     { id: 'consulta', label: 'Consultar', icon: Search },
     { id: 'produtos', label: 'Produtos', icon: Boxes },
-    { id: 'usuarios', label: 'Usuários', icon: Users },
+    { id: 'orcamento', label: 'Orçamentos', icon: Calculator },
     { id: 'dashboard', label: 'Painel', icon: LayoutDashboard },
   ];
 
@@ -47,6 +48,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
     { id: 'bipagem', label: 'Bipar / Localizar', desc: 'Identificar produto e ver prateleira física', icon: Barcode },
     { id: 'consulta', label: 'Consulta de Produtos', desc: 'Busca rápida e filtros avançados', icon: Search },
     { id: 'produtos', label: 'Catálogo de Produtos', desc: `${totalProductsCount} itens cadastrados`, icon: Boxes },
+    { id: 'orcamento', label: 'Criar Orçamento', desc: 'Simular valores e distribuir descontos', icon: Calculator },
     { id: 'dashboard', label: 'Painel Geral', desc: 'Resumo e alertas do galpão', icon: LayoutDashboard },
     { id: 'importacao', label: 'Importação CSV/JSON', desc: 'Carga de planilhas da empresa', icon: UploadCloud },
     { id: 'usuarios', label: 'Gerenciamento Usuários', desc: 'Operadores, senhas e permissões', icon: Users },

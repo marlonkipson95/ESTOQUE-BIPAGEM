@@ -191,6 +191,7 @@ export type AppModule =
   | 'bipagem'
   | 'consulta'
   | 'produtos'
+  | 'orcamento'
   | 'usuarios'
   | 'importacao'
   | 'configuracoes';
@@ -213,4 +214,26 @@ export interface ImportParsedRow {
   status: 'novo' | 'atualizacao' | 'conflito' | 'invalido';
   conflictReason?: string;
   existingProduct?: Product;
+}
+
+export interface OrcamentoItem {
+  id: string; // Gerado localmente (uuid ou timestamp)
+  produto_id?: string;
+  descricao: string;
+  quantidade: number;
+  preco_tabela?: number;
+  preco_sugerido?: number;
+  preco_minimo?: number;
+  valor_unitario: number;
+  subtotal: number;
+}
+
+export interface Orcamento {
+  id?: string;
+  nome_cliente: string;
+  responsavel: string;
+  itens: OrcamentoItem[];
+  total_orcamento: number;
+  criado_em?: string;
+  atualizado_em?: string;
 }

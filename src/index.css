@@ -13,3 +13,34 @@ html, body {
   overscroll-behavior-y: contain;
   scroll-behavior: smooth;
 }
+
+@media print {
+  html, body {
+    height: auto !important;
+    overflow: visible !important;
+    background: white !important;
+  }
+  
+  #root {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  
+  .flex-1 {
+    display: block !important;
+    overflow: visible !important;
+  }
+  
+  .orcamento-print-container {
+    box-shadow: none !important;
+    border: none !important;
+  }
+  
+  /* Esconder sidebar e header no print já são tratados pelas classes do Tailwind print:hidden se configurado corretamente,
+     mas garantir que os containeres scrolláveis fiquem com overflow visible: */
+  main {
+    overflow: visible !important;
+    height: auto !important;
+  }
+}
