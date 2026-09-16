@@ -74,8 +74,8 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
           audio: false,
           video: {
             facingMode: { ideal: facingMode },
-            width: { ideal: 1920, min: 1280 },
-            height: { ideal: 1080, min: 720 },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
             advanced: [
               { focusMode: 'continuous' },
               { exposureMode: 'continuous' },

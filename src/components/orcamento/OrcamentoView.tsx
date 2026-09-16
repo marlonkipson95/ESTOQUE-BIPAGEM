@@ -402,7 +402,7 @@ export const OrcamentoView: React.FC<OrcamentoViewProps> = ({
           </div>
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 print:border-none print:overflow-visible">
+        <div className="hidden sm:block overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 print:border-none print:overflow-visible">
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-800 print:bg-transparent print:border-b-2 print:border-black">
@@ -464,6 +464,58 @@ export const OrcamentoView: React.FC<OrcamentoViewProps> = ({
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Cards View */}
+        <div className="sm:hidden space-y-3 print:hidden">
+          {(currentOrcamento.itens || []).length === 0 ? (
+            <div className="p-8 text-center bg-slate-50 dark:bg-slate-800/30 rounded-xl border border-slate-200 dark:border-slate-800 text-slate-500 font-bold text-sm">
+              Nenhuma peça adicionada.
+            </div>
+          ) : (
+            (currentOrcamento.itens || []).map(item => (
+              <div key={item.id} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3 shadow-sm flex flex-col gap-3">
+                <div className="flex justify-between items-start gap-2">
+                  <div className="font-bold text-sm text-slate-900 dark:text-white">{item.descricao}</div>
+                  <button onClick={() => removeItem(item.id)} className="text-slate-400 hover:text-red-500 p-1 shrink-0">
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-2 text-xs font-mono text-slate-500 bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg">
+                  <div>Mín: {formatCurrency(item.preco_minimo || 0)}</div>
+                  <div>Sug: {formatCurrency(item.preco_sugerido || 0)}</div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center bg-slate-100 dark:bg-slate-800 rounded-lg p-1">
+                    <button onClick={() => updateItemQty(item.id, item.quantidade - 1)} className="w-8 h-8 flex items-center justify-center font-black text-slate-600 dark:text-slate-400">-</button>
+                    <div className="w-10 text-center font-bold text-sm bg-transparent border-none outline-none">{item.quantidade}</div>
+                    <button onClick={() => updateItemQty(item.id, item.quantidade + 1)} className="w-8 h-8 flex items-center justify-center font-black text-slate-600 dark:text-slate-400">+</button>
+                  </div>
+                  
+                  <div className="flex-1">
+                    <input 
+                      type="number"
+                      step="0.01"
+                      value={item.valor_unitario}
+                      onChange={e => updateItemPrice(item.id, parseFloat(e.target.value) || 0)}
+                      className={`w-full p-2 text-right text-sm font-bold border rounded-lg bg-white dark:bg-slate-900 ${item.preco_minimo && item.valor_unitario < item.preco_minimo ? 'border-rose-500 text-rose-600' : 'border-slate-300 dark:border-slate-700'}`}
+                      placeholder="V. Unit"
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex justify-between items-center pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <span className="text-xs font-bold text-slate-500">Subtotal</span>
+                  <span className="font-black text-slate-900 dark:text-white text-base">{formatCurrency(item.subtotal)}</span>
+                </div>
+                {item.preco_minimo && item.valor_unitario < item.preco_minimo && (
+                  <div className="text-[10px] text-rose-500 font-bold text-right leading-tight mt-1">Abaixo do mínimo!</div>
+                )}
+              </div>
+            ))
+          )}
         </div>
 
         <div className="flex flex-col sm:flex-row justify-between items-end gap-6 bg-slate-50 dark:bg-slate-800/30 p-4 sm:p-6 rounded-2xl border border-slate-200 dark:border-slate-800 print:bg-transparent print:border-none print:p-0 mt-6">
