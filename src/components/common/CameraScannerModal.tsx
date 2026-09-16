@@ -30,6 +30,8 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
   const [manualCode, setManualCode] = useState('');
   const [showManualInput, setShowManualInput] = useState(false);
   const [nativeDetectionActive, setNativeDetectionActive] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const captureRequestedRef = useRef(false);
 
   useEffect(() => {
     if (!isOpen) {
@@ -106,8 +108,12 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
 
         const handleDetectedCode = (rawText: string) => {
           if (!isSubscribed) return;
+          if (!captureRequestedRef.current) return;
+          
           const text = rawText ? rawText.trim().replace(/\s+/g, '') : '';
           if (text) {
+            captureRequestedRef.current = false;
+            setIsCapturing(false);
             beepService.playSuccess();
             onScan(text);
             stopCamera();
@@ -279,8 +285,35 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
               <div className="absolute -bottom-1 -right-1 h-5 w-5 border-b-4 border-r-4 border-indigo-400 rounded-br" />
 
               {/* Red Laser Sweep Line Animation */}
-              <div className="absolute inset-x-0 top-1/2 h-0.5 bg-rose-500 shadow-[0_0_8px_#f43f5e] animate-pulse" />
+              <div className={`absolute inset-x-0 top-1/2 h-0.5 shadow-[0_0_8px_#f43f5e] ${isCapturing ? 'bg-emerald-500 shadow-emerald-500 animate-pulse' : 'bg-rose-500 animate-none opacity-50'}`} />
             </div>
+          </div>
+          
+          {/* Capture Button Overlay */}
+          <div className="absolute bottom-6 inset-x-0 flex justify-center z-20">
+            <button
+              onClick={() => {
+                if (isCapturing) return;
+                setIsCapturing(true);
+                captureRequestedRef.current = true;
+                setError(null);
+                
+                // Timeout if not found
+                setTimeout(() => {
+                  if (captureRequestedRef.current) {
+                    captureRequestedRef.current = false;
+                    setIsCapturing(false);
+                    setError('Não foi possível ler. Tente focar melhor e capturar novamente.');
+                  }
+                }, 3000);
+              }}
+              className={`rounded-full px-8 py-3 font-bold text-white shadow-xl flex items-center gap-2 transition-all ${
+                isCapturing ? 'bg-emerald-500 scale-95' : 'bg-indigo-600 hover:bg-indigo-500'
+              }`}
+            >
+              <Camera className="h-5 w-5" />
+              {isCapturing ? 'Lendo...' : 'Capturar'}
+            </button>
           </div>
 
           {/* Error notice */}
