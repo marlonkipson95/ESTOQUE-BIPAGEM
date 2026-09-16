@@ -1,4 +1,3 @@
-import React from 'react';
 import {
   LayoutDashboard,
   Search,
@@ -12,6 +11,7 @@ import {
   LogOut,
   User,
   Calculator,
+  ShieldCheck,
 } from 'lucide-react';
 import { AppModule, SystemUser } from '../../types';
 
@@ -49,6 +49,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
     { id: 'consulta', label: 'Consulta de Produtos', desc: 'Busca rápida e filtros avançados', icon: Search },
     { id: 'produtos', label: 'Catálogo de Produtos', desc: `${totalProductsCount} itens cadastrados`, icon: Boxes },
     { id: 'orcamento', label: 'Criar Orçamento', desc: 'Simular valores e distribuir descontos', icon: Calculator },
+    { id: 'auditoria', label: 'Auditoria & Reversão', desc: 'Histórico de edições e reversão', icon: ShieldCheck },
     { id: 'dashboard', label: 'Painel Geral', desc: 'Resumo e alertas do galpão', icon: LayoutDashboard },
     { id: 'importacao', label: 'Importação CSV/JSON', desc: 'Carga de planilhas da empresa', icon: UploadCloud },
     { id: 'usuarios', label: 'Gerenciamento Usuários', desc: 'Operadores, senhas e permissões', icon: Users },

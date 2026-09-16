@@ -13,7 +13,7 @@ interface OrcamentoViewProps {
   onClearExternalScannedCode: () => void;
 }
 
-const RESPONSAVEIS = ['Vlamidir', 'Thiago', 'Alexandro', 'Marlon', 'Lucas'];
+const RESPONSAVEIS = ['Vladimir', 'Thiago', 'Alexandro', 'Marlon', 'Lucas'];
 
 export const OrcamentoView: React.FC<OrcamentoViewProps> = ({
   products,
@@ -298,6 +298,10 @@ export const OrcamentoView: React.FC<OrcamentoViewProps> = ({
                 <div className="mt-4 flex gap-2">
                   <button onClick={() => { setCurrentOrcamento(o); setViewState('edit'); }} className="flex-1 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 py-2 rounded-xl text-xs font-bold transition text-center">
                     Ver / Editar
+                  </button>
+                  <button onClick={() => { setCurrentOrcamento(o); setViewState('edit'); setTimeout(() => window.print(), 150); }} className="px-3 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1" title="Imprimir Orçamento">
+                    <Printer className="h-3.5 w-3.5" />
+                    <span>Imprimir</span>
                   </button>
                 </div>
               </div>

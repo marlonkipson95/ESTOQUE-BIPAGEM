@@ -31,6 +31,8 @@ const MODULE_NAMES: Record<AppModule, { title: string; subtitle: string }> = {
   bipagem: { title: 'Bipagem & Identificação', subtitle: 'Identificação imediata do produto e da sua localização física' },
   consulta: { title: 'Consulta de Mercadorias', subtitle: 'Busca rápida por qualquer código, descrição ou locação' },
   produtos: { title: 'Produtos do Estoque', subtitle: 'Cadastro, estoque e catálogo de mercadorias' },
+  orcamento: { title: 'Orçamentos de Venda', subtitle: 'Simulação de valores, descontos e comprovantes para impressão' },
+  auditoria: { title: 'Auditoria & Rastreabilidade', subtitle: 'Livro de registro técnico e reversão segura de alterações' },
   dashboard: { title: 'Painel Operacional', subtitle: 'Situação geral do armazém e métricas' },
   importacao: { title: 'Importação de Planilha', subtitle: 'Carga via CSV/Excel da base existente da empresa' },
   usuarios: { title: 'Gerenciamento de Usuários', subtitle: 'Operadores, senhas e credenciais de acesso' },

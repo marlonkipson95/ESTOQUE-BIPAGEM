@@ -192,9 +192,23 @@ export type AppModule =
   | 'consulta'
   | 'produtos'
   | 'orcamento'
+  | 'auditoria'
   | 'usuarios'
   | 'importacao'
   | 'configuracoes';
+
+export interface AuditoriaRecord {
+  id: number;
+  produto_id: string;
+  codigo_atual?: string;
+  descricao?: string;
+  campo: string;
+  valor_anterior: string | null;
+  valor_novo: string | null;
+  motivo?: string;
+  usuario?: string;
+  criado_em: string;
+}
 
 export interface ConsultaFilters {
   searchTerm: string;

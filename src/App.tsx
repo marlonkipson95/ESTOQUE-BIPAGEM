@@ -28,6 +28,7 @@ import { BipagemView } from './components/bipagem/BipagemView';
 import { ProdutosView } from './components/produtos/ProdutosView';
 import { ImportacaoView } from './components/importacao/ImportacaoView';
 import { OrcamentoView } from './components/orcamento/OrcamentoView';
+import { AuditoriaView } from './components/auditoria/AuditoriaView';
 import { UsuariosView } from './components/usuarios/UsuariosView';
 import { ConfiguracoesView } from './components/configuracoes/ConfiguracoesView';
 
@@ -264,6 +265,15 @@ export default function App() {
               onOpenQuickScan={() => setIsCameraScannerOpen(true)}
               externalScannedCode={incomingScannedCode}
               onClearExternalScannedCode={() => setIncomingScannedCode('')}
+            />
+          )}
+
+          {activeModule === 'auditoria' && (
+            <AuditoriaView 
+              onSelectProduct={id => {
+                const found = products.find(p => p.id === id);
+                if (found) setSelectedProduct(found);
+              }}
             />
           )}
 

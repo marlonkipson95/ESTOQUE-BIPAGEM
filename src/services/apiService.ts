@@ -256,36 +256,161 @@ class ApiService {
   }
 
   // =====================================
-  // ORÇAMENTOS
+  // ORÇAMENTOS (Com suporte a Modo Offline)
   // =====================================
 
-  async getOrcamentos(): Promise<import('../types').Orcamento[]> {
-    const res = await fetch(`${this.baseUrl}/orcamentos`);
-    if (!res.ok) throw new Error('Falha ao listar orçamentos');
-    return await res.json();
+  private getOfflineOrcamentosQueue(): import('../types').Orcamento[] {
+    try {
+      const stored = localStorage.getItem('kipstock_offline_orcamentos');
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
   }
 
-  async salvarOrcamento(orcamento: Partial<import('../types').Orcamento>): Promise<{ success: boolean; orcamento?: import('../types').Orcamento }> {
-    const res = await fetch(`${this.baseUrl}/orcamentos`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(orcamento),
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Falha ao salvar orçamento');
+  private saveOfflineOrcamentosQueue(queue: import('../types').Orcamento[]): void {
+    try {
+      localStorage.setItem('kipstock_offline_orcamentos', JSON.stringify(queue));
+    } catch (e) {
+      console.error('Falha ao salvar fila offline:', e);
     }
-    return await res.json();
+  }
+
+  async syncOfflineQueue(): Promise<{ synced: number }> {
+    if (!navigator.onLine) return { synced: 0 };
+    const queue = this.getOfflineOrcamentosQueue();
+    if (queue.length === 0) return { synced: 0 };
+
+    let synced = 0;
+    const remaining: import('../types').Orcamento[] = [];
+
+    for (const item of queue) {
+      try {
+        const res = await fetch(`${this.baseUrl}/orcamentos`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(item),
+        });
+        if (res.ok) {
+          synced++;
+        } else {
+          remaining.push(item);
+        }
+      } catch {
+        remaining.push(item);
+      }
+    }
+
+    this.saveOfflineOrcamentosQueue(remaining);
+    return { synced };
+  }
+
+  async getOrcamentos(): Promise<import('../types').Orcamento[]> {
+    const offlineItems = this.getOfflineOrcamentosQueue();
+    try {
+      const res = await fetch(`${this.baseUrl}/orcamentos`);
+      if (res.ok) {
+        const serverItems: import('../types').Orcamento[] = await res.json();
+        // Sincronizar itens pendentes em background se houver
+        if (offlineItems.length > 0 && navigator.onLine) {
+          this.syncOfflineQueue().catch(() => {});
+        }
+        // Retornar mesclando com itens offline que ainda não subiram
+        const serverIds = new Set(serverItems.map(s => s.id));
+        const unuploaded = offlineItems.filter(o => !serverIds.has(o.id));
+        return [...unuploaded, ...serverItems];
+      }
+    } catch (e) {
+      console.warn('[Offline] Servidor inacessível, retornando orçamentos offline locais.');
+    }
+    return offlineItems;
+  }
+
+  async salvarOrcamento(orcamento: Partial<import('../types').Orcamento>): Promise<{ success: boolean; orcamento?: import('../types').Orcamento; offline?: boolean }> {
+    const fullOrcamento: import('../types').Orcamento = {
+      id: orcamento.id || `temp-${Date.now()}`,
+      nome_cliente: orcamento.nome_cliente || '',
+      responsavel: orcamento.responsavel || 'Marlon',
+      itens: orcamento.itens || [],
+      total_orcamento: orcamento.total_orcamento || 0,
+      criado_em: orcamento.criado_em || new Date().toISOString(),
+      atualizado_em: new Date().toISOString(),
+    };
+
+    if (!navigator.onLine) {
+      const queue = this.getOfflineOrcamentosQueue();
+      const idx = queue.findIndex(q => q.id === fullOrcamento.id);
+      if (idx >= 0) queue[idx] = fullOrcamento;
+      else queue.unshift(fullOrcamento);
+      this.saveOfflineOrcamentosQueue(queue);
+      return { success: true, orcamento: fullOrcamento, offline: true };
+    }
+
+    try {
+      const res = await fetch(`${this.baseUrl}/orcamentos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orcamento),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Falha ao salvar orçamento');
+      }
+      return await res.json();
+    } catch (err: any) {
+      // Contingência Offline
+      const queue = this.getOfflineOrcamentosQueue();
+      const idx = queue.findIndex(q => q.id === fullOrcamento.id);
+      if (idx >= 0) queue[idx] = fullOrcamento;
+      else queue.unshift(fullOrcamento);
+      this.saveOfflineOrcamentosQueue(queue);
+      return { success: true, orcamento: fullOrcamento, offline: true };
+    }
   }
 
   async excluirOrcamento(id: string): Promise<void> {
-    const res = await fetch(`${this.baseUrl}/orcamentos/${id}`, {
-      method: 'DELETE',
+    // Remover da fila offline se existir
+    const queue = this.getOfflineOrcamentosQueue().filter(q => q.id !== id);
+    this.saveOfflineOrcamentosQueue(queue);
+
+    if (navigator.onLine) {
+      try {
+        const res = await fetch(`${this.baseUrl}/orcamentos/${id}`, {
+          method: 'DELETE',
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.error || 'Falha ao excluir orçamento');
+        }
+      } catch (err: any) {
+        console.warn('Exclusão remota falhou ou em contingência:', err.message);
+      }
+    }
+  }
+
+  // =====================================
+  // AUDITORIA E RASTREABILIDADE
+  // =====================================
+
+  async getAuditoria(search?: string): Promise<import('../types').AuditoriaRecord[]> {
+    const query = search ? `?search=${encodeURIComponent(search)}` : '';
+    const res = await fetch(`${this.baseUrl}/auditoria${query}`);
+    if (!res.ok) throw new Error('Falha ao carregar registros de auditoria');
+    const data = await res.json();
+    return data.registros || [];
+  }
+
+  async reverterAuditoria(id: number, usuario: string = 'Programador / Admin'): Promise<{ success: boolean; message: string }> {
+    const res = await fetch(`${this.baseUrl}/auditoria/reverter/${id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ usuario }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err.error || 'Falha ao excluir orçamento');
+      throw new Error(err.error || 'Falha ao reverter alteração');
     }
+    return await res.json();
   }
 }
 

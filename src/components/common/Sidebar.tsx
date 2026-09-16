@@ -45,6 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'consulta', label: 'Consulta Estoque', icon: Search },
     { id: 'produtos', label: 'Produtos Cadastrados', icon: Boxes, badge: totalProductsCount },
     { id: 'orcamento', label: 'Orçamentos', icon: Calculator },
+    { id: 'auditoria', label: 'Auditoria & Reversão', icon: ShieldCheck },
     { id: 'dashboard', label: 'Painel Geral', icon: LayoutDashboard },
     { id: 'importacao', label: 'Importar Planilha', icon: UploadCloud },
     { id: 'usuarios', label: 'Usuários do Sistema', icon: Users },
