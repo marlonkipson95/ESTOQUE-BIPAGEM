@@ -630,6 +630,10 @@ apiRouter.post('/produtos', async (req: Request, res: Response) => {
   const cleanCode = codigo_atual?.trim() || '';
   const cleanFactory = codigo_fabrica?.trim() || '';
 
+  if (!cleanCode && !cleanFactory) {
+    return res.status(400).json({ error: 'O código do produto ou código de fábrica é obrigatório.' });
+  }
+
   const pool = getDbPool();
   if (pool) {
     const client = await pool.connect();
@@ -1019,6 +1023,13 @@ apiRouter.put('/produtos/:id', async (req: Request, res: Response) => {
     nivel,
     locacao,
   } = req.body;
+
+  const cleanCode = codigo_atual?.trim() || '';
+  const cleanFactory = codigo_fabrica?.trim() || '';
+  
+  if (!cleanCode && !cleanFactory) {
+    return res.status(400).json({ error: 'O código do produto ou código de fábrica é obrigatório.' });
+  }
 
   const pool = getDbPool();
   if (pool) {
