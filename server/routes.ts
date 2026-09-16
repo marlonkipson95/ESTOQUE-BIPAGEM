@@ -11,6 +11,9 @@ interface MemoryProduct {
   codigo_barras_atual: string;
   descricao: string;
   custo_unitario: number;
+  preco_tabela?: number;
+  preco_sugerido?: number;
+  preco_minimo?: number;
   quantidade: number;
   estoque_minimo: number;
   corredor: string;
@@ -19,6 +22,8 @@ interface MemoryProduct {
   locacao: string;
   codigos_alternativos?: string[];
   produtos_relacionados?: any[];
+  total_genericos?: number;
+  codigos_genericos?: string[];
   criado_em: string;
   atualizado_em: string;
 }
@@ -53,14 +58,24 @@ async function loadProductExtras(client: any, product: any) {
   if (!product) return product;
   try {
     const rels = await client.query(`
-      SELECT pr.id as rel_id, pr.motivo, p.id, p.codigo_atual, p.descricao, p.codigo_barras_atual, p.codigo_fabrica, p.quantidade, p.locacao, p.corredor, p.baia, p.nivel
+      SELECT DISTINCT pr.id as rel_id, pr.motivo, p.id, p.codigo_atual, p.descricao, p.codigo_barras_atual, p.codigo_fabrica, p.quantidade, p.locacao, p.corredor, p.baia, p.nivel, p.preco_tabela, p.preco_sugerido, p.preco_minimo
       FROM produtos_relacionados pr
       JOIN produtos p ON (p.id = CASE WHEN pr.produto_id = $1 THEN pr.relacionado_id ELSE pr.produto_id END)
-      WHERE pr.produto_id = $1 OR pr.relacionado_id = $1
+      WHERE (pr.produto_id = $1 OR pr.relacionado_id = $1) AND p.id <> $1
     `, [product.id]);
-    product.produtos_relacionados = rels.rows;
+    product.produtos_relacionados = rels.rows.map((r: any) => ({
+      ...r,
+      quantidade: Number(r.quantidade) || 0,
+      preco_tabela: Number(r.preco_tabela) || 0,
+      preco_sugerido: Number(r.preco_sugerido) || 0,
+      preco_minimo: Number(r.preco_minimo) || 0,
+    }));
+    product.total_genericos = product.produtos_relacionados.length;
+    product.codigos_genericos = product.produtos_relacionados.map((r: any) => r.codigo_fabrica || r.codigo_atual).filter(Boolean);
   } catch (e) {
     product.produtos_relacionados = [];
+    product.total_genericos = 0;
+    product.codigos_genericos = [];
   }
 
   if (typeof product.codigos_alternativos === 'string') {
@@ -97,8 +112,13 @@ function loadMemoryProductExtras(product: any) {
       corredor: target.corredor,
       baia: target.baia,
       nivel: target.nivel,
+      preco_tabela: Number(target.preco_tabela) || 0,
+      preco_sugerido: Number(target.preco_sugerido) || 0,
+      preco_minimo: Number(target.preco_minimo) || 0,
     } : null;
   }).filter(Boolean);
+  product.total_genericos = product.produtos_relacionados.length;
+  product.codigos_genericos = product.produtos_relacionados.map((r: any) => r.codigo_fabrica || r.codigo_atual).filter(Boolean);
 
   if (typeof product.codigos_alternativos === 'string') {
     product.codigos_alternativos = product.codigos_alternativos
@@ -295,13 +315,19 @@ apiRouter.post('/produtos/scan', async (req: Request, res: Response) => {
   // Etapa 1
   const p1 = memoryProducts.find(
     p => p.codigo_barras_atual?.toUpperCase() === cleanCode.toUpperCase() ||
-         p.codigo_atual?.toUpperCase() === cleanCode.toUpperCase()
+         p.codigo_atual?.toUpperCase() === cleanCode.toUpperCase() ||
+         p.codigo_fabrica?.toUpperCase() === cleanCode.toUpperCase()
   );
   if (p1) {
+    const isBarcode = p1.codigo_barras_atual?.toUpperCase() === cleanCode.toUpperCase();
+    const isFactory = p1.codigo_fabrica?.toUpperCase() === cleanCode.toUpperCase();
     return res.json({
       status: 'found_current',
-      product: p1,
-      activeCodeType: p1.codigo_barras_atual?.toUpperCase() === cleanCode.toUpperCase() ? 'codigo_barras' : 'codigo_produto',
+      product: loadMemoryProductExtras(p1),
+      activeCodeType: isBarcode ? 'codigo_barras' : (isFactory ? 'codigo_fabrica' : 'codigo_produto'),
+      message: isFactory
+        ? 'Mercadoria já cadastrada identificada pelo Código de Fábrica. Dados mantidos.'
+        : 'Mercadoria já cadastrada identificada no estoque. Dados mantidos.',
     });
   }
 
@@ -442,7 +468,9 @@ apiRouter.get('/produtos', async (req: Request, res: Response) => {
 
         // Data query
         const dataQuery = `
-          SELECT p.* FROM produtos p
+          SELECT p.*,
+            (SELECT COUNT(*) FROM produtos_relacionados pr WHERE pr.produto_id = p.id OR pr.relacionado_id = p.id)::int as total_genericos
+          FROM produtos p
           ${whereClause}
           ORDER BY p.atualizado_em DESC
           LIMIT $${paramIdx} OFFSET $${paramIdx + 1}
@@ -457,6 +485,7 @@ apiRouter.get('/produtos', async (req: Request, res: Response) => {
           preco_tabela: Number(p.preco_tabela) || 0,
           preco_sugerido: Number(p.preco_sugerido) || 0,
           preco_minimo: Number(p.preco_minimo) || 0,
+          total_genericos: Number(p.total_genericos) || 0,
         }));
 
         return res.json({
@@ -516,7 +545,10 @@ apiRouter.get('/produtos', async (req: Request, res: Response) => {
     filtered = filtered.filter(p => !p.codigo_barras_atual);
   }
 
-  const paginated = filtered.slice(offset, offset + limitNum);
+  const paginated = filtered.slice(offset, offset + limitNum).map(p => ({
+    ...p,
+    total_genericos: memoryRelatedProducts.filter(r => r.produto_id === p.id || r.relacionado_id === p.id).length,
+  }));
 
   res.json({
     products: paginated,
@@ -1270,12 +1302,19 @@ apiRouter.get('/produtos/:id/relacionados', async (req: Request, res: Response) 
     const client = await pool.connect();
     try {
       const rels = await client.query(`
-        SELECT pr.id as rel_id, pr.motivo, p.id, p.codigo_atual, p.descricao, p.codigo_barras_atual, p.codigo_fabrica, p.quantidade, p.locacao, p.corredor, p.baia, p.nivel
+        SELECT DISTINCT pr.id as rel_id, pr.motivo, p.id, p.codigo_atual, p.descricao, p.codigo_barras_atual, p.codigo_fabrica, p.quantidade, p.locacao, p.corredor, p.baia, p.nivel, p.preco_tabela, p.preco_sugerido, p.preco_minimo
         FROM produtos_relacionados pr
         JOIN produtos p ON (p.id = CASE WHEN pr.produto_id = $1 THEN pr.relacionado_id ELSE pr.produto_id END)
-        WHERE pr.produto_id = $1 OR pr.relacionado_id = $1
+        WHERE (pr.produto_id = $1 OR pr.relacionado_id = $1) AND p.id <> $1
       `, [id]);
-      return res.json({ relacionados: rels.rows });
+      const formatted = rels.rows.map((r: any) => ({
+        ...r,
+        quantidade: Number(r.quantidade) || 0,
+        preco_tabela: Number(r.preco_tabela) || 0,
+        preco_sugerido: Number(r.preco_sugerido) || 0,
+        preco_minimo: Number(r.preco_minimo) || 0,
+      }));
+      return res.json({ relacionados: formatted });
     } finally {
       client.release();
     }
@@ -1298,6 +1337,9 @@ apiRouter.get('/produtos/:id/relacionados', async (req: Request, res: Response) 
       corredor: target.corredor,
       baia: target.baia,
       nivel: target.nivel,
+      preco_tabela: Number(target.preco_tabela) || 0,
+      preco_sugerido: Number(target.preco_sugerido) || 0,
+      preco_minimo: Number(target.preco_minimo) || 0,
     } : null;
   }).filter(Boolean);
 
@@ -1306,22 +1348,64 @@ apiRouter.get('/produtos/:id/relacionados', async (req: Request, res: Response) 
 
 apiRouter.post('/produtos/:id/relacionados', async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { relacionado_id, motivo = 'Similar / Genérico' } = req.body;
+  const { relacionado_id, codigo, codigo_generico, motivo = 'Peça genérica / compatível' } = req.body;
 
-  if (!relacionado_id || relacionado_id === id) {
-    return res.status(400).json({ error: 'ID do produto relacionado é inválido.' });
-  }
+  let targetId = relacionado_id;
+  const codeToFind = (codigo || codigo_generico || '').trim();
 
   const pool = getDbPool();
   if (pool) {
     const client = await pool.connect();
     try {
+      if (!targetId && codeToFind) {
+        // Localizar produto pelo código de fábrica, código interno ou código de barras
+        const searchRes = await client.query(`
+          SELECT id, descricao, codigo_fabrica, codigo_atual FROM produtos
+          WHERE UPPER(codigo_fabrica) = UPPER($1)
+             OR UPPER(codigo_atual) = UPPER($1)
+             OR UPPER(codigo_barras_atual) = UPPER($1)
+             OR (LENGTH($1) >= 4 AND REPLACE(REPLACE(codigo_fabrica, ' ', ''), '-', '') = REPLACE(REPLACE($1, ' ', ''), '-', ''))
+          LIMIT 1
+        `, [codeToFind]);
+
+        if (searchRes.rows.length === 0) {
+          return res.status(404).json({ error: `Nenhum produto cadastrado encontrado com o código "${codeToFind}".` });
+        }
+        targetId = searchRes.rows[0].id;
+      }
+
+      if (!targetId || targetId === id) {
+        return res.status(400).json({ error: 'ID ou código do produto relacionado é inválido ou igual ao próprio produto.' });
+      }
+
+      // 1. Inserir relação direta
       await client.query(`
         INSERT INTO produtos_relacionados (produto_id, relacionado_id, motivo)
         VALUES ($1, $2, $3)
         ON CONFLICT (produto_id, relacionado_id) DO NOTHING
-      `, [id, relacionado_id, motivo]);
-      return res.status(201).json({ success: true, message: 'Produto relacionado vinculado com sucesso.' });
+      `, [id, targetId, motivo]);
+
+      // 2. Unificar o grupo de genéricos: buscar todos os itens já ligados a A ou B e interconectar
+      const existingPeers = await client.query(`
+        SELECT DISTINCT CASE WHEN produto_id = $1 OR produto_id = $2 THEN relacionado_id ELSE produto_id END as peer_id
+        FROM produtos_relacionados
+        WHERE produto_id IN ($1, $2) OR relacionado_id IN ($1, $2)
+      `, [id, targetId]);
+
+      const allGroupIds = Array.from(new Set([id, targetId, ...existingPeers.rows.map(r => r.peer_id)]));
+      for (const pA of allGroupIds) {
+        for (const pB of allGroupIds) {
+          if (pA !== pB) {
+            await client.query(`
+              INSERT INTO produtos_relacionados (produto_id, relacionado_id, motivo)
+              VALUES ($1, $2, $3)
+              ON CONFLICT (produto_id, relacionado_id) DO NOTHING
+            `, [pA, pB, motivo]);
+          }
+        }
+      }
+
+      return res.status(201).json({ success: true, message: 'Produto genérico vinculado com sucesso.' });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
     } finally {
@@ -1329,20 +1413,37 @@ apiRouter.post('/produtos/:id/relacionados', async (req: Request, res: Response)
     }
   }
 
+  // Fallback em memória
+  if (!targetId && codeToFind) {
+    const found = memoryProducts.find(p =>
+      p.codigo_fabrica?.toUpperCase() === codeToFind.toUpperCase() ||
+      p.codigo_atual?.toUpperCase() === codeToFind.toUpperCase() ||
+      p.codigo_barras_atual?.toUpperCase() === codeToFind.toUpperCase()
+    );
+    if (!found) {
+      return res.status(404).json({ error: `Nenhum produto cadastrado encontrado com o código "${codeToFind}".` });
+    }
+    targetId = found.id;
+  }
+
+  if (!targetId || targetId === id) {
+    return res.status(400).json({ error: 'Produto relacionado inválido.' });
+  }
+
   const exists = memoryRelatedProducts.some(
-    r => (r.produto_id === id && r.relacionado_id === relacionado_id) ||
-         (r.produto_id === relacionado_id && r.relacionado_id === id)
+    r => (r.produto_id === id && r.relacionado_id === targetId) ||
+         (r.produto_id === targetId && r.relacionado_id === id)
   );
   if (!exists) {
     memoryRelatedProducts.push({
       id: Date.now(),
       produto_id: id,
-      relacionado_id,
+      relacionado_id: targetId,
       motivo,
       criado_em: new Date().toISOString(),
     });
   }
-  return res.status(201).json({ success: true, message: 'Produto relacionado vinculado com sucesso.' });
+  return res.status(201).json({ success: true, message: 'Produto genérico vinculado com sucesso.' });
 });
 
 apiRouter.delete('/produtos/:id/relacionados/:relacionadoId', async (req: Request, res: Response) => {
@@ -1693,6 +1794,55 @@ apiRouter.post('/importar', async (req: Request, res: Response) => {
         }
       }
 
+      // Processar vínculos de códigos genéricos informados na planilha
+      for (const item of items) {
+        const rawGen = String(item.genericos || item.codigos_genericos || '').trim();
+        if (!rawGen) continue;
+
+        const codFabrica = item.codigo_fabrica?.trim() || '';
+        const codAtual = item.codigo_atual?.trim() || '';
+        const barcode = item.codigo_barras_atual?.trim() || '';
+
+        const mainRes = await client.query(`
+          SELECT id FROM produtos
+          WHERE (UPPER(codigo_fabrica) = UPPER($1) AND $1 <> '')
+             OR (UPPER(codigo_atual) = UPPER($2) AND $2 <> '')
+             OR (UPPER(codigo_barras_atual) = UPPER($3) AND $3 <> '')
+          LIMIT 1
+        `, [codFabrica, codAtual, barcode]);
+
+        if (mainRes.rows.length === 0) continue;
+        const mainId = mainRes.rows[0].id;
+
+        const genList = rawGen.split(/[,;\n]/).map((s: string) => s.trim()).filter(Boolean);
+        for (const gCode of genList) {
+          const peerRes = await client.query(`
+            SELECT id FROM produtos
+            WHERE UPPER(codigo_fabrica) = UPPER($1)
+               OR UPPER(codigo_atual) = UPPER($1)
+               OR UPPER(codigo_barras_atual) = UPPER($1)
+            LIMIT 1
+          `, [gCode]);
+
+          if (peerRes.rows.length > 0) {
+            const peerId = peerRes.rows[0].id;
+            if (peerId !== mainId) {
+              await client.query(`
+                INSERT INTO produtos_relacionados (produto_id, relacionado_id, motivo)
+                VALUES ($1, $2, 'Importado via Planilha')
+                ON CONFLICT (produto_id, relacionado_id) DO NOTHING
+              `, [mainId, peerId]);
+
+              await client.query(`
+                INSERT INTO produtos_relacionados (produto_id, relacionado_id, motivo)
+                VALUES ($1, $2, 'Importado via Planilha')
+                ON CONFLICT (produto_id, relacionado_id) DO NOTHING
+              `, [peerId, mainId]);
+            }
+          }
+        }
+      }
+
       // Registrar lote
       await client.query(`
         INSERT INTO lotes_importacao (arquivo, total, novos, atualizados, erros, usuario)
@@ -1728,6 +1878,7 @@ apiRouter.post('/importar', async (req: Request, res: Response) => {
     const existing = (codAtual ? memoryProducts.find(p => p.codigo_atual?.toUpperCase() === codAtual.toUpperCase()) : null) ||
                      (barcode ? memoryProducts.find(p => p.codigo_barras_atual?.toUpperCase() === barcode.toUpperCase()) : null) ||
                      (codFabrica ? memoryProducts.find(p => p.codigo_fabrica?.toUpperCase() === codFabrica.toUpperCase()) : null);
+    let targetId = existing ? existing.id : '';
     if (existing) {
       atualizados++;
       existing.descricao = item.descricao;
@@ -1735,6 +1886,7 @@ apiRouter.post('/importar', async (req: Request, res: Response) => {
     } else {
       novos++;
       const nextId = `PRD-${String(memoryProducts.length + 1).padStart(4, '0')}`;
+      targetId = nextId;
       memoryProducts.unshift({
         id: nextId,
         codigo_atual: item.codigo_atual || nextId,
@@ -1751,6 +1903,23 @@ apiRouter.post('/importar', async (req: Request, res: Response) => {
         criado_em: new Date().toISOString(),
         atualizado_em: new Date().toISOString(),
       });
+    }
+
+    const rawGen = String(item.genericos || item.codigos_genericos || '').trim();
+    if (rawGen && targetId) {
+      const gCodes = rawGen.split(/[,;\n]/).map((s: string) => s.trim()).filter(Boolean);
+      for (const gc of gCodes) {
+        const peer = memoryProducts.find(p => p.codigo_fabrica?.toUpperCase() === gc.toUpperCase() || p.codigo_atual?.toUpperCase() === gc.toUpperCase());
+        if (peer && peer.id !== targetId) {
+          memoryRelatedProducts.push({
+            id: Date.now() + Math.random(),
+            produto_id: targetId,
+            relacionado_id: peer.id,
+            motivo: 'Importado via Planilha',
+            criado_em: new Date().toISOString(),
+          });
+        }
+      }
     }
   });
 

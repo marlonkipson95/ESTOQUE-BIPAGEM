@@ -11,10 +11,12 @@ import {
   AlertCircle,
   ExternalLink,
   RotateCcw,
+  Plus,
 } from 'lucide-react';
 import { Product, ProductCodeHistory, ConsultaFilters } from '../../types';
 import { LocationBadge } from '../common/LocationBadge';
 import { formatCurrency } from '../../utils/formatters';
+import { GenericProductsModal } from '../common/GenericProductsModal';
 
 interface ConsultaViewProps {
   products: Product[];
@@ -37,6 +39,12 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
 }) => {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [displayLimit, setDisplayLimit] = useState(48);
+  const [genericModalProduct, setGenericModalProduct] = useState<Product | null>(null);
+
+  const formatPriceOnlyNumber = (val?: number) => {
+    if (val === undefined || val === null || isNaN(val)) return '0,00';
+    return Number(val).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
 
   useEffect(() => {
     setDisplayLimit(48);
@@ -471,34 +479,56 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
                         </div>
                       </div>
 
-                      {/* 4. PREÇOS DE VENDA (TABELA, SUGERIDO, MÍNIMO) - ALTO DESTAQUE E VISIBILIDADE */}
-                      <div className="mt-3.5 pt-3 border-t border-slate-200 dark:border-slate-800">
-                        <span className="block text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-2">
-                          Preços de Venda
+                      {/* CÓDIGOS GENÉRICOS / PEÇAS COMPATÍVEIS */}
+                      <div className="mt-3 flex items-center justify-between gap-1.5 p-2 rounded-xl border border-indigo-100 bg-indigo-50/50 dark:border-indigo-900/40 dark:bg-indigo-950/20">
+                        <button
+                          type="button"
+                          onClick={() => setGenericModalProduct(product)}
+                          className="inline-flex items-center gap-1.5 text-xs font-black text-indigo-700 dark:text-indigo-300 hover:underline"
+                        >
+                          <Layers className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                          <span>
+                            {(product.total_genericos ?? (Array.isArray(product.produtos_relacionados) ? product.produtos_relacionados.length : 0))} cd. genérico{(product.total_genericos ?? (Array.isArray(product.produtos_relacionados) ? product.produtos_relacionados.length : 0)) !== 1 ? 's' : ''}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setGenericModalProduct(product)}
+                          className="inline-flex items-center gap-0.5 rounded-lg px-2 py-0.5 text-[11px] font-bold text-indigo-600 hover:bg-indigo-100/70 dark:text-indigo-300 dark:hover:bg-indigo-900/50 transition"
+                        >
+                          <Plus className="h-3 w-3" />
+                          <span>Vincular</span>
+                        </button>
+                      </div>
+
+                      {/* 4. PREÇOS DE VENDA (TABELA, SUGERIDO, MÍNIMO) - PREÇO DE VENDA (R$) COM FONTE AMPLIADA */}
+                      <div className="mt-3 pt-2.5 border-t border-slate-200 dark:border-slate-800">
+                        <span className="block text-[11px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-400 mb-1.5">
+                          Preço de Venda (R$)
                         </span>
                         <div className="grid grid-cols-3 gap-1.5 sm:gap-2 text-center">
-                          <div className="rounded-xl bg-slate-100/90 p-2 sm:p-2.5 border-2 border-slate-300 dark:bg-slate-800 dark:border-slate-700 min-w-0 shadow-sm">
-                            <span className="block text-[10px] sm:text-[11px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-wider">
+                          <div className="rounded-xl bg-slate-100/90 p-1.5 sm:p-2 border-2 border-slate-300 dark:bg-slate-800 dark:border-slate-700 min-w-0 shadow-sm">
+                            <span className="block text-[9px] sm:text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-wider">
                               TABELA
                             </span>
-                            <span className="font-mono text-xs sm:text-sm md:text-base font-black text-slate-900 dark:text-white truncate block mt-0.5">
-                              {formatCurrency(product.preco_tabela)}
+                            <span className="font-mono text-sm sm:text-base md:text-lg font-black text-slate-900 dark:text-white truncate block mt-0.5">
+                              {formatPriceOnlyNumber(product.preco_tabela)}
                             </span>
                           </div>
-                          <div className="rounded-xl bg-indigo-50 p-2 sm:p-2.5 border-2 border-indigo-300 dark:bg-indigo-950/60 dark:border-indigo-700 min-w-0 shadow-sm">
-                            <span className="block text-[10px] sm:text-[11px] font-black text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">
+                          <div className="rounded-xl bg-indigo-50 p-1.5 sm:p-2 border-2 border-indigo-300 dark:bg-indigo-950/60 dark:border-indigo-700 min-w-0 shadow-sm">
+                            <span className="block text-[9px] sm:text-[10px] font-black text-indigo-700 dark:text-indigo-300 uppercase tracking-wider">
                               SUGERIDO
                             </span>
-                            <span className="font-mono text-xs sm:text-sm md:text-base font-black text-indigo-800 dark:text-indigo-200 truncate block mt-0.5">
-                              {formatCurrency(product.preco_sugerido)}
+                            <span className="font-mono text-sm sm:text-base md:text-lg font-black text-indigo-800 dark:text-indigo-200 truncate block mt-0.5">
+                              {formatPriceOnlyNumber(product.preco_sugerido)}
                             </span>
                           </div>
-                          <div className="rounded-xl bg-emerald-50 p-2 sm:p-2.5 border-2 border-emerald-300 dark:bg-emerald-950/60 dark:border-emerald-700 min-w-0 shadow-sm">
-                            <span className="block text-[10px] sm:text-[11px] font-black text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">
+                          <div className="rounded-xl bg-emerald-50 p-1.5 sm:p-2 border-2 border-emerald-300 dark:bg-emerald-950/60 dark:border-emerald-700 min-w-0 shadow-sm">
+                            <span className="block text-[9px] sm:text-[10px] font-black text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">
                               MÍNIMO
                             </span>
-                            <span className="font-mono text-xs sm:text-sm md:text-base font-black text-emerald-800 dark:text-emerald-200 truncate block mt-0.5">
-                              {formatCurrency(product.preco_minimo)}
+                            <span className="font-mono text-sm sm:text-base md:text-lg font-black text-emerald-800 dark:text-emerald-200 truncate block mt-0.5">
+                              {formatPriceOnlyNumber(product.preco_minimo)}
                             </span>
                           </div>
                         </div>
@@ -506,7 +536,7 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
                     </div>
 
                     {/* Footer Action */}
-                    <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800">
+                    <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
                       <button
                         onClick={() => onSelectProduct(product)}
                         className="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-900 py-2.5 text-xs font-bold text-white hover:bg-slate-800 dark:bg-indigo-600 dark:hover:bg-indigo-500 transition shadow-sm"
@@ -538,6 +568,16 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* MODAL DE CÓDIGOS GENÉRICOS / PEÇAS COMPATÍVEIS */}
+      {genericModalProduct && (
+        <GenericProductsModal
+          isOpen={Boolean(genericModalProduct)}
+          onClose={() => setGenericModalProduct(null)}
+          product={genericModalProduct}
+          onSelectProduct={onSelectProduct}
+        />
+      )}
     </div>
   );
 };

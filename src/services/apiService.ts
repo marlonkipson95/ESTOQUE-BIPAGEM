@@ -187,11 +187,19 @@ class ApiService {
     return await res.json();
   }
 
-  async addRelatedProduct(id: string, relacionado_id: string, motivo?: string): Promise<{ success: boolean; message: string }> {
+  async addRelatedProduct(
+    id: string,
+    params: { relacionado_id?: string; codigo?: string; codigo_generico?: string; motivo?: string } | string,
+    motivoParam?: string
+  ): Promise<{ success: boolean; message: string }> {
+    const payload = typeof params === 'string'
+      ? { relacionado_id: params, motivo: motivoParam }
+      : params;
+
     const res = await fetch(`${this.baseUrl}/produtos/${encodeURIComponent(id)}/relacionados`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ relacionado_id, motivo }),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));

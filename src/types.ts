@@ -44,6 +44,8 @@ export interface Product {
   codigo_barras_atual: string; // Current active barcode / EAN (e.g. '7891234567890')
   codigos_alternativos?: string[]; // Códigos alternativos adicionais apontando para este mesmo produto
   produtos_relacionados?: RelatedProductSummary[]; // Lista de produtos genéricos / similares relacionados
+  total_genericos?: number; // Contagem de códigos genéricos / similares vinculados
+  codigos_genericos?: string[]; // Lista de códigos de fábrica/códigos genéricos vinculados
   corredor: string; // Aisle (e.g. '03')
   baia: string; // Bay (e.g. 'B12')
   nivel: string; // Shelf Level (e.g. '04')

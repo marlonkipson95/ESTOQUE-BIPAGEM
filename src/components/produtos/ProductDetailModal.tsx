@@ -171,13 +171,22 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   // Add related generic product
   const handleAddRelated = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedRelProductId) return;
+    const targetIdOrCode = selectedRelProductId || searchRelTerm.trim();
+    if (!targetIdOrCode) return;
 
     try {
-      await apiService.addRelatedProduct(currentProduct.id, selectedRelProductId, relMotivo);
+      if (selectedRelProductId) {
+        await apiService.addRelatedProduct(currentProduct.id, selectedRelProductId, relMotivo);
+      } else {
+        await apiService.addRelatedProduct(currentProduct.id, {
+          codigo: searchRelTerm.trim(),
+          motivo: relMotivo,
+        });
+      }
       beepService.playSuccess();
-      setFeedbackMsg({ type: 'success', text: 'Produto genérico/similar associado com sucesso!' });
+      setFeedbackMsg({ type: 'success', text: 'Código genérico associado com sucesso!' });
       setSelectedRelProductId('');
+      setSearchRelTerm('');
       loadRelated();
     } catch (err: any) {
       beepService.playError();
@@ -526,18 +535,18 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </div>
 
                 {/* 3 PREÇOS DE VENDA (TABELA, SUGERIDO, MÍNIMO) */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                  <div className="p-2.5 rounded-xl border border-blue-200 bg-blue-50/50 dark:border-blue-900/40 dark:bg-blue-950/20">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] uppercase font-black tracking-wider text-blue-700 dark:text-blue-300">
-                        TABELA
-                      </span>
-                      <Tag className="h-3 w-3 text-blue-500" />
-                    </div>
-                    <div className="relative">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-[11px] font-bold text-blue-600 dark:text-blue-400">
-                        R$
-                      </span>
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-300 block">
+                    Preço de Venda (R$)
+                  </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <div className="p-2.5 rounded-xl border border-blue-200 bg-blue-50/50 dark:border-blue-900/40 dark:bg-blue-950/20">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] uppercase font-black tracking-wider text-blue-700 dark:text-blue-300">
+                          TABELA
+                        </span>
+                        <Tag className="h-3 w-3 text-blue-500" />
+                      </div>
                       <input
                         type="number"
                         step="0.01"
@@ -545,22 +554,17 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                         value={precoTabela}
                         onChange={e => setPrecoTabela(e.target.value)}
                         placeholder="0,00"
-                        className="w-full rounded-lg border border-blue-200 bg-white pl-8 pr-2 py-1.5 font-mono font-bold text-xs text-blue-900 dark:border-blue-800 dark:bg-slate-900 dark:text-blue-200 text-right"
+                        className="w-full rounded-lg border border-blue-200 bg-white px-3 py-1.5 font-mono font-black text-sm text-blue-900 dark:border-blue-800 dark:bg-slate-900 dark:text-blue-200 text-center"
                       />
                     </div>
-                  </div>
 
-                  <div className="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/40 dark:bg-emerald-950/20">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] uppercase font-black tracking-wider text-emerald-700 dark:text-emerald-300">
-                        SUGERIDO
-                      </span>
-                      <Tag className="h-3 w-3 text-emerald-500" />
-                    </div>
-                    <div className="relative">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                        R$
-                      </span>
+                    <div className="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] uppercase font-black tracking-wider text-emerald-700 dark:text-emerald-300">
+                          SUGERIDO
+                        </span>
+                        <Tag className="h-3 w-3 text-emerald-500" />
+                      </div>
                       <input
                         type="number"
                         step="0.01"
@@ -568,22 +572,17 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                         value={precoSugerido}
                         onChange={e => setPrecoSugerido(e.target.value)}
                         placeholder="0,00"
-                        className="w-full rounded-lg border border-emerald-200 bg-white pl-8 pr-2 py-1.5 font-mono font-bold text-xs text-emerald-900 dark:border-emerald-800 dark:bg-slate-900 dark:text-emerald-200 text-right"
+                        className="w-full rounded-lg border border-emerald-200 bg-white px-3 py-1.5 font-mono font-black text-sm text-emerald-900 dark:border-emerald-800 dark:bg-slate-900 dark:text-emerald-200 text-center"
                       />
                     </div>
-                  </div>
 
-                  <div className="p-2.5 rounded-xl border border-purple-200 bg-purple-50/50 dark:border-purple-900/40 dark:bg-purple-950/20">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] uppercase font-black tracking-wider text-purple-700 dark:text-purple-300">
-                        MÍNIMO
-                      </span>
-                      <Tag className="h-3 w-3 text-purple-500" />
-                    </div>
-                    <div className="relative">
-                      <span className="absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-[11px] font-bold text-purple-600 dark:text-purple-400">
-                        R$
-                      </span>
+                    <div className="p-2.5 rounded-xl border border-purple-200 bg-purple-50/50 dark:border-purple-900/40 dark:bg-purple-950/20">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] uppercase font-black tracking-wider text-purple-700 dark:text-purple-300">
+                          MÍNIMO
+                        </span>
+                        <Tag className="h-3 w-3 text-purple-500" />
+                      </div>
                       <input
                         type="number"
                         step="0.01"
@@ -591,7 +590,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                         value={precoMinimo}
                         onChange={e => setPrecoMinimo(e.target.value)}
                         placeholder="0,00"
-                        className="w-full rounded-lg border border-purple-200 bg-white pl-8 pr-2 py-1.5 font-mono font-bold text-xs text-purple-900 dark:border-purple-800 dark:bg-slate-900 dark:text-purple-200 text-right"
+                        className="w-full rounded-lg border border-purple-200 bg-white px-3 py-1.5 font-mono font-black text-sm text-purple-900 dark:border-purple-800 dark:bg-slate-900 dark:text-purple-200 text-center"
                       />
                     </div>
                   </div>
@@ -838,7 +837,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     <div className="mt-3 flex justify-end">
                       <button
                         type="submit"
-                        disabled={!selectedRelProductId}
+                        disabled={!selectedRelProductId && !searchRelTerm.trim()}
                         className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 font-bold text-white hover:bg-indigo-500 disabled:opacity-50 shadow"
                       >
                         <Link2 className="h-3.5 w-3.5" />

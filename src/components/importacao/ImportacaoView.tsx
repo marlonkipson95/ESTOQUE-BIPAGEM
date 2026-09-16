@@ -42,6 +42,7 @@ export const ImportacaoView: React.FC<ImportacaoViewProps> = ({ onImportComplete
     baia: '',
     nivel: '',
     locacao: '',
+    genericos: '',
   });
 
   // Protection options (Business rules)
@@ -121,6 +122,7 @@ export const ImportacaoView: React.FC<ImportacaoViewProps> = ({ onImportComplete
       else if (lower.includes('baia') || lower.includes('modulo')) autoMap.baia = header;
       else if (lower.includes('nivel') || lower.includes('prateleira')) autoMap.nivel = header;
       else if (lower.includes('locacao') || lower.includes('endereco') || lower.includes('posicao')) autoMap.locacao = header;
+      else if (lower.includes('gener') || lower.includes('similar') || lower.includes('compat')) autoMap.genericos = header;
     });
 
     setFieldMapping(autoMap);
@@ -147,6 +149,7 @@ export const ImportacaoView: React.FC<ImportacaoViewProps> = ({ onImportComplete
         baia: fieldMapping.baia ? row[fieldMapping.baia]?.trim() : '',
         nivel: fieldMapping.nivel ? row[fieldMapping.nivel]?.trim() : '',
         locacao: fieldMapping.locacao ? row[fieldMapping.locacao]?.trim() : '',
+        genericos: fieldMapping.genericos ? row[fieldMapping.genericos]?.trim() : '',
       }))
       .filter(i => Boolean(i.descricao));
 
@@ -517,6 +520,22 @@ PRD-0001;CHAVE COMBINADA 13MM BELZER CR-V;504.02.1;7899999000111;50;03;B12;04;03
                 value={fieldMapping.locacao}
                 onChange={e => setFieldMapping(prev => ({ ...prev, locacao: e.target.value }))}
                 className="w-full rounded-lg border border-slate-300 p-2 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+              >
+                <option value="">(Nenhuma)</option>
+                {parsedHeaders.map(h => (
+                  <option key={h} value={h}>{h}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <label className="font-bold text-slate-700 dark:text-slate-300">
+                Códigos Genéricos / Similares
+              </label>
+              <select
+                value={fieldMapping.genericos}
+                onChange={e => setFieldMapping(prev => ({ ...prev, genericos: e.target.value }))}
+                className="w-full rounded-lg border border-indigo-300 p-2 text-slate-900 dark:border-indigo-700 dark:bg-slate-800 dark:text-white"
               >
                 <option value="">(Nenhuma)</option>
                 {parsedHeaders.map(h => (
