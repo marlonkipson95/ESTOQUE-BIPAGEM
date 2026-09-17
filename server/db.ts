@@ -200,6 +200,19 @@ export async function initDatabaseSchema(): Promise<void> {
       ON CONFLICT (username) DO NOTHING;
     `);
 
+    // 6b. Tabela orcamentos (Orçamentos salvos)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS orcamentos (
+        id SERIAL PRIMARY KEY,
+        nome_cliente VARCHAR(120) NOT NULL DEFAULT 'Cliente Balcão',
+        responsavel VARCHAR(100) NOT NULL,
+        itens JSONB NOT NULL,
+        total_orcamento NUMERIC(12, 2) NOT NULL DEFAULT 0.00,
+        criado_em TIMESTAMPTZ DEFAULT NOW(),
+        atualizado_em TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
     // 7. Índices para alta performance e unicidade
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_produtos_codigo_atual ON produtos(codigo_atual);
