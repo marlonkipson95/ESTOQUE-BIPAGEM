@@ -30,8 +30,7 @@ import { ImportacaoView } from './components/importacao/ImportacaoView';
 import { OrcamentoView } from './components/orcamento/OrcamentoView';
 import { AuditoriaView } from './components/auditoria/AuditoriaView';
 import { UsuariosView } from './components/usuarios/UsuariosView';
-import { ConfiguracoesView } from './components/configuracoes/ConfiguracoesView';
-
+import { ChatAssistant } from './components/chat/ChatAssistant';
 export default function App() {
   // Authentication State
   const [authSession, setAuthSession] = useState<AuthSession>(authService.getSession());
@@ -289,14 +288,9 @@ export default function App() {
 
           {activeModule === 'usuarios' && <UsuariosView />}
 
-          {activeModule === 'configuracoes' && (
-            <ConfiguracoesView
-              onDatabaseReset={() => {
-                refreshData();
-              }}
-            />
-          )}
         </main>
+        
+        <ChatAssistant />
 
         {/* Mobile Touch Navigation Bar & Drawer */}
         <MobileNav

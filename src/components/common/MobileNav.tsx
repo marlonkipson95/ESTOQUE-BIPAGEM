@@ -1,3 +1,4 @@
+import React from 'react';
 import {
   LayoutDashboard,
   Search,
@@ -52,9 +53,11 @@ export const MobileNav: React.FC<MobileNavProps> = ({
     { id: 'auditoria', label: 'Auditoria & Reversão', desc: 'Histórico de edições e reversão', icon: ShieldCheck },
     { id: 'dashboard', label: 'Painel Geral', desc: 'Resumo e alertas do galpão', icon: LayoutDashboard },
     { id: 'importacao', label: 'Importação CSV/JSON', desc: 'Carga de planilhas da empresa', icon: UploadCloud },
-    { id: 'usuarios', label: 'Gerenciamento Usuários', desc: 'Operadores, senhas e permissões', icon: Users },
-    { id: 'configuracoes', label: 'Configurações', desc: 'Parâmetros, Banco Neon e locais', icon: Settings },
   ];
+
+  if (currentUser?.cargo === 'Administrador') {
+    allModules.push({ id: 'usuarios', label: 'Gerenciamento Usuários', desc: 'Operadores, senhas e permissões', icon: Users });
+  }
 
   return (
     <>

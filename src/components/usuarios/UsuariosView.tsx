@@ -24,6 +24,18 @@ export const UsuariosView: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  const currentUser = authService.getSession().user;
+
+  if (currentUser?.cargo !== 'Administrador') {
+    return (
+      <div className="p-8 flex flex-col items-center justify-center text-slate-500">
+        <Shield className="h-16 w-16 text-slate-300 mb-4" />
+        <h2 className="text-xl font-bold">Acesso Negado</h2>
+        <p>Apenas Administradores podem gerenciar usuários do sistema.</p>
+      </div>
+    );
+  }
+
   // Modals state
   const [isNewUserModalOpen, setIsNewUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<SystemUser | null>(null);

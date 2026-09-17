@@ -48,9 +48,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'auditoria', label: 'Auditoria & Reversão', icon: ShieldCheck },
     { id: 'dashboard', label: 'Painel Geral', icon: LayoutDashboard },
     { id: 'importacao', label: 'Importar Planilha', icon: UploadCloud },
-    { id: 'usuarios', label: 'Usuários do Sistema', icon: Users },
-    { id: 'configuracoes', label: 'Configurações', icon: Settings },
   ];
+
+  if (currentUser?.cargo === 'Administrador') {
+    navItems.push({ id: 'usuarios', label: 'Usuários do Sistema', icon: Users });
+  }
 
   return (
     <aside className="hidden md:flex w-64 flex-col border-r border-slate-200 bg-slate-900 text-slate-300">

@@ -2,6 +2,10 @@ import { Router, Request, Response } from 'express';
 import { getDbPool, checkDatabaseConnection } from './db.js';
 
 export const apiRouter = Router();
+import { chatRouter } from './chat.js';
+import { cosmosRouter, fetchCosmosProduct } from './cosmos.js';
+apiRouter.use('/chat', chatRouter);
+apiRouter.use('/cosmos', cosmosRouter);
 
 // Fallback in-memory store if DATABASE_URL is not set yet
 interface MemoryProduct {
@@ -387,8 +391,40 @@ apiRouter.post('/produtos/scan', async (req: Request, res: Response) => {
           });
         }
 
-        // ETAPA 4: Não cadastrado diretamente -> Busca Inteligente de Peças Candidatas Compatíveis
-        const identifiedInfo = identifyBarcodeInfo(cleanCode);
+        // ETAPA 4: Não cadastrado diretamente -> Busca Inteligente e Consulta Cosmos
+        const identifiedInfo: any = identifyBarcodeInfo(cleanCode);
+
+        // Consulta Externa via Bluesoft Cosmos API
+        let cosmosData: any = null;
+        let cosmosStatus: number | null = null;
+        let cosmosMessage: string | null = null;
+
+        if (/^\d{7,14}$/.test(normalizedCode)) {
+          try {
+            const cosmosRes = await fetchCosmosProduct(normalizedCode);
+            cosmosStatus = cosmosRes.status;
+            cosmosMessage = cosmosRes.message || null;
+            if (cosmosRes.success && cosmosRes.data) {
+              cosmosData = cosmosRes.data;
+              if (cosmosRes.data.description) {
+                identifiedInfo.descricao_sugerida = cosmosRes.data.description;
+              }
+              if (cosmosRes.data.brand) {
+                identifiedInfo.fabricante = cosmosRes.data.brand;
+              }
+              if (cosmosRes.data.ncm) {
+                identifiedInfo.ncm = cosmosRes.data.ncm;
+              }
+              if (cosmosRes.data.thumbnail) {
+                identifiedInfo.thumbnail = cosmosRes.data.thumbnail;
+              }
+              identifiedInfo.origem = 'Bluesoft Cosmos';
+            }
+          } catch (err: any) {
+            console.error('[API] Falha ao consultar Cosmos no scan PostgreSQL:', err.message);
+          }
+        }
+
         const searchTerms = [
           identifiedInfo.codigo_extraido,
           cleanCode.length === 13 ? cleanCode.substring(7, 12) : null,
@@ -421,9 +457,11 @@ apiRouter.post('/produtos/scan', async (req: Request, res: Response) => {
           }
         }
 
-        const brandMsg = identifiedInfo.fabricante 
-          ? `Código de barras ${identifiedInfo.fabricante} (${cleanCode}) reconhecido! Selecione uma peça existente para vincular ou atualizar.`
-          : `Código de barras ${cleanCode} não localizado diretamente na base de dados.`;
+        const brandMsg = cosmosData?.description
+          ? `Identificado no Bluesoft Cosmos: "${cosmosData.description}"!`
+          : (identifiedInfo.fabricante 
+              ? `Código de barras ${identifiedInfo.fabricante} (${cleanCode}) reconhecido! Selecione uma peça existente para vincular ou atualizar.`
+              : `Código de barras ${cleanCode} não localizado diretamente na base de dados.`);
 
         return res.json({
           status: 'not_found',
@@ -431,6 +469,9 @@ apiRouter.post('/produtos/scan', async (req: Request, res: Response) => {
           identifiedInfo,
           candidates,
           message: brandMsg,
+          cosmosData,
+          cosmosStatus,
+          cosmosMessage,
         });
       } finally {
         client.release();
@@ -493,7 +534,38 @@ apiRouter.post('/produtos/scan', async (req: Request, res: Response) => {
   }
 
   // Etapa 4 Memory Fallback
-  const identifiedInfo = identifyBarcodeInfo(cleanCode);
+  const identifiedInfo: any = identifyBarcodeInfo(cleanCode);
+
+  let cosmosData: any = null;
+  let cosmosStatus: number | null = null;
+  let cosmosMessage: string | null = null;
+
+  if (/^\d{7,14}$/.test(cleanCode.replace(/[\s\.-]/g, ''))) {
+    try {
+      const cosmosRes = await fetchCosmosProduct(cleanCode);
+      cosmosStatus = cosmosRes.status;
+      cosmosMessage = cosmosRes.message || null;
+      if (cosmosRes.success && cosmosRes.data) {
+        cosmosData = cosmosRes.data;
+        if (cosmosRes.data.description) {
+          identifiedInfo.descricao_sugerida = cosmosRes.data.description;
+        }
+        if (cosmosRes.data.brand) {
+          identifiedInfo.fabricante = cosmosRes.data.brand;
+        }
+        if (cosmosRes.data.ncm) {
+          identifiedInfo.ncm = cosmosRes.data.ncm;
+        }
+        if (cosmosRes.data.thumbnail) {
+          identifiedInfo.thumbnail = cosmosRes.data.thumbnail;
+        }
+        identifiedInfo.origem = 'Bluesoft Cosmos';
+      }
+    } catch (err: any) {
+      console.error('[API] Falha ao consultar Cosmos no memory scan:', err.message);
+    }
+  }
+
   const searchTerms = [
     identifiedInfo.codigo_extraido,
     cleanCode.length === 13 ? cleanCode.substring(7, 12) : null,
@@ -517,9 +589,11 @@ apiRouter.post('/produtos/scan', async (req: Request, res: Response) => {
     }
   }
 
-  const brandMsg = identifiedInfo.fabricante 
-    ? `Código de barras ${identifiedInfo.fabricante} (${cleanCode}) reconhecido! Selecione uma peça existente para vincular ou atualizar.`
-    : `Código de barras ${cleanCode} não localizado diretamente na base de dados.`;
+  const brandMsg = cosmosData?.description
+    ? `Identificado no Bluesoft Cosmos: "${cosmosData.description}"!`
+    : (identifiedInfo.fabricante 
+        ? `Código de barras ${identifiedInfo.fabricante} (${cleanCode}) reconhecido! Selecione uma peça existente para vincular ou atualizar.`
+        : `Código de barras ${cleanCode} não localizado diretamente na base de dados.`);
 
   return res.json({
     status: 'not_found',
@@ -527,6 +601,9 @@ apiRouter.post('/produtos/scan', async (req: Request, res: Response) => {
     identifiedInfo,
     candidates: memCandidates,
     message: brandMsg,
+    cosmosData,
+    cosmosStatus,
+    cosmosMessage,
   });
 });
 

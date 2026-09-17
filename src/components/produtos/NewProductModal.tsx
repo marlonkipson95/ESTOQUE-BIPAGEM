@@ -50,6 +50,8 @@ export const NewProductModal: React.FC<NewProductModalProps> = ({
   const [showAdvancedCodes, setShowAdvancedCodes] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isCosmosLoading, setIsCosmosLoading] = useState(false);
+  const [cosmosVerified, setCosmosVerified] = useState(false);
 
   const corredorRef = useRef<HTMLInputElement | null>(null);
 
@@ -59,6 +61,27 @@ export const NewProductModal: React.FC<NewProductModalProps> = ({
       corredorRef.current?.focus();
     }, 150);
   }, []);
+
+  // Consultar automaticamente Cosmos se for um código de barras EAN/GTIN
+  useEffect(() => {
+    const cleanGtin = scannedInput.replace(/[\s\.-]/g, '');
+    if (/^\d{7,14}$/.test(cleanGtin)) {
+      setIsCosmosLoading(true);
+      apiService.consultarCosmos(cleanGtin)
+        .then(res => {
+          if (res.success && res.data) {
+            if (res.data.description) {
+              setDescricao(res.data.description);
+              setCosmosVerified(true);
+            }
+          }
+        })
+        .catch(() => {})
+        .finally(() => {
+          setIsCosmosLoading(false);
+        });
+    }
+  }, [scannedInput]);
 
   const formattedLocacao = [corredor.trim(), baia.trim(), nivel.trim()]
     .filter(Boolean)
@@ -196,9 +219,21 @@ export const NewProductModal: React.FC<NewProductModalProps> = ({
             </div>
 
             <div className="mt-2.5">
-              <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300 mb-1">
-                Descrição da Mercadoria
-              </label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-[11px] font-bold text-slate-700 dark:text-slate-300">
+                  Descrição da Mercadoria
+                </label>
+                {cosmosVerified && (
+                  <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-900">
+                    ✓ Verificado no Bluesoft Cosmos
+                  </span>
+                )}
+                {isCosmosLoading && (
+                  <span className="text-[10px] text-indigo-600 animate-pulse font-semibold">
+                    Consultando Cosmos...
+                  </span>
+                )}
+              </div>
               <input
                 type="text"
                 value={descricao}

@@ -198,8 +198,7 @@ export type AppModule =
   | 'orcamento'
   | 'auditoria'
   | 'usuarios'
-  | 'importacao'
-  | 'configuracoes';
+  | 'importacao';
 
 export interface AuditoriaRecord {
   id: number;

@@ -36,7 +36,6 @@ const MODULE_NAMES: Record<AppModule, { title: string; subtitle: string }> = {
   dashboard: { title: 'Painel Operacional', subtitle: 'Situação geral do armazém e métricas' },
   importacao: { title: 'Importação de Planilha', subtitle: 'Carga via CSV/Excel da base existente da empresa' },
   usuarios: { title: 'Gerenciamento de Usuários', subtitle: 'Operadores, senhas e credenciais de acesso' },
-  configuracoes: { title: 'Configurações do Sistema', subtitle: 'Parâmetros, Banco Neon PostgreSQL e preferências' },
 };
 
 export const Header: React.FC<HeaderProps> = ({

@@ -19,6 +19,8 @@ import {
   Save,
   Link2,
   Search,
+  RefreshCw,
+  Globe,
 } from 'lucide-react';
 import { Product, ScanResult } from '../../types';
 import { storageService } from '../../services/storageService';
@@ -63,6 +65,10 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
   const [inlineDescricao, setInlineDescricao] = useState('');
   const [isRegisteringInline, setIsRegisteringInline] = useState(false);
   const [inlineError, setInlineError] = useState<string | null>(null);
+
+  // Bluesoft Cosmos API Query State
+  const [isQueryingCosmos, setIsQueryingCosmos] = useState(false);
+  const [cosmosWarning, setCosmosWarning] = useState<string | null>(null);
 
   // Consecutive Scans / Repeat Scan Tracking (Regra do Usuário)
   const [consecutiveScanCount, setConsecutiveScanCount] = useState<number>(1);
@@ -142,7 +148,7 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
         await apiService.vincularCodigo(targetProductToUpdate.id, cleanBar, 'codigo_barras', 'Atualização com novos dados de bipagem').catch(() => {});
       }
 
-      const storageRes = storageService.updateProduct(targetProductToUpdate.id, updatedFields);
+      const storageRes = storageService.updateProduct({ ...targetProductToUpdate, ...updatedFields });
       if (cleanBar) {
         storageService.vincularCodigoBarras(targetProductToUpdate.id, cleanBar);
       }
@@ -484,6 +490,14 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
           beepService.playWarning();
           const parsed = (serverResult as any).identifiedInfo || parseScannedLabel(code);
           const candidates: Product[] = (serverResult as any).candidates || [];
+          const cosmosData = (serverResult as any).cosmosData;
+          const cosmosStatus = (serverResult as any).cosmosStatus;
+
+          if (cosmosStatus === 429) {
+            setCosmosWarning('Limite do plano gratuito (25 consultas/dia) atingido hoje. O código foi extraído com sucesso; informe apenas a descrição manualmente.');
+          } else {
+            setCosmosWarning(null);
+          }
 
           setScanResult({
             code,
@@ -492,7 +506,9 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
             candidates,
             message: serverResult.message || 'Código não localizado diretamente no cadastro.',
             timestamp: new Date().toISOString(),
-          });
+            cosmosData,
+            cosmosStatus,
+          } as any);
 
           setInlineDescricao(parsed.descricao_sugerida || (parsed.fabricante ? `PEÇA ${parsed.fabricante}` : ''));
           setNotFoundTab('link');
@@ -575,6 +591,52 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
     }
   };
 
+  const handleConsultarCosmos = async (gtin: string) => {
+    const cleanGtin = (gtin || '').trim();
+    if (!cleanGtin) return;
+
+    setIsQueryingCosmos(true);
+    setCosmosWarning(null);
+
+    try {
+      const res = await apiService.consultarCosmos(cleanGtin);
+      if (res.success && res.data) {
+        if (res.data.description) {
+          setInlineDescricao(res.data.description);
+        }
+        setScanResult(prev => {
+          if (!prev) return prev;
+          const currentIdent = prev.identifiedInfo || parseScannedLabel(cleanGtin);
+          return {
+            ...prev,
+            identifiedInfo: {
+              ...currentIdent,
+              descricao_sugerida: res.data!.description || currentIdent.descricao_sugerida,
+              fabricante: res.data!.brand || currentIdent.fabricante,
+              ncm: res.data!.ncm,
+              thumbnail: res.data!.thumbnail,
+              origem: 'Bluesoft Cosmos',
+            },
+            cosmosData: res.data,
+            cosmosStatus: 200,
+          } as any;
+        });
+        beepService.playSuccess();
+      } else if (res.status === 429) {
+        setCosmosWarning('Limite do plano gratuito (25 consultas/dia) atingido hoje. O código foi extraído com sucesso; informe apenas a descrição manualmente.');
+        beepService.playWarning();
+      } else {
+        setCosmosWarning(res.message || 'Código não cadastrado no catálogo do Bluesoft Cosmos.');
+        beepService.playWarning();
+      }
+    } catch (err: any) {
+      setCosmosWarning('Falha ao conectar com o serviço de consulta Cosmos.');
+      beepService.playWarning();
+    } finally {
+      setIsQueryingCosmos(false);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (inputCode.trim()) {
@@ -651,7 +713,7 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
       return;
     }
 
-    const parsed = parseScannedLabel(scanResult.code);
+    const parsed: any = scanResult.identifiedInfo || parseScannedLabel(scanResult.code);
     const finalCorredor = inlineCorredor.trim().toUpperCase();
     const finalBaia = inlineBaia.trim().toUpperCase();
     const finalNivel = inlineNivel.trim().toUpperCase();
@@ -670,8 +732,10 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
 
     const payload = {
       descricao: desc,
-      codigo_barras_atual: parsed.codigo_barras || undefined,
+      codigo_barras_atual: parsed.codigo_barras || scanResult.code,
       codigo_fabrica: parsed.codigo_fabrica || undefined,
+      marca: parsed.fabricante || undefined,
+      ncm: parsed.ncm || undefined,
       corredor: finalCorredor,
       baia: finalBaia,
       nivel: finalNivel,
@@ -1307,46 +1371,107 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
 
               {/* Detected Codes Banner & Intelligent Recognition */}
               {(() => {
-                const parsed = scanResult.identifiedInfo || parseScannedLabel(scanResult.code);
+                const parsed: any = scanResult.identifiedInfo || parseScannedLabel(scanResult.code);
+                const cosmosData: any = (scanResult as any).cosmosData;
+                const isFromCosmos = parsed.origem === 'Bluesoft Cosmos' || !!cosmosData;
+
                 return (
-                  <div className="mt-4 rounded-xl border border-indigo-200 bg-indigo-50/80 p-4 dark:border-indigo-900 dark:bg-indigo-950/40 shadow-sm">
+                  <div className={`mt-4 rounded-xl border p-4 shadow-sm transition-all ${
+                    isFromCosmos 
+                      ? 'border-emerald-300 bg-emerald-50/80 dark:border-emerald-800 dark:bg-emerald-950/30' 
+                      : 'border-indigo-200 bg-indigo-50/80 dark:border-indigo-900 dark:bg-indigo-950/40'
+                  }`}>
                     <div className="flex items-center justify-between gap-2 flex-wrap mb-2.5">
-                      <div className="flex items-center gap-1.5 text-xs font-black text-indigo-900 dark:text-indigo-200">
-                        <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                        <span>Identificação Inteligente do Bipe:</span>
+                      <div className="flex items-center gap-1.5 text-xs font-black">
+                        {isFromCosmos ? (
+                          <>
+                            <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                            <span className="text-emerald-900 dark:text-emerald-200">Identificação Oficial via Bluesoft Cosmos:</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                            <span className="text-indigo-900 dark:text-indigo-200">Identificação Inteligente do Bipe:</span>
+                          </>
+                        )}
                       </div>
-                      {parsed.fabricante && (
-                        <span className="rounded-full bg-indigo-600 text-white px-3 py-0.5 text-[11px] font-black uppercase tracking-wider shadow-sm">
-                          {parsed.fabricante}
-                        </span>
-                      )}
+
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {parsed.fabricante && (
+                          <span className={`rounded-full px-3 py-0.5 text-[11px] font-black uppercase tracking-wider shadow-sm text-white ${
+                            isFromCosmos ? 'bg-emerald-600' : 'bg-indigo-600'
+                          }`}>
+                            {parsed.fabricante}
+                          </span>
+                        )}
+                        {parsed.ncm && (
+                          <span className="rounded-full bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 px-2.5 py-0.5 text-[10px] font-bold">
+                            NCM: {parsed.ncm}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs font-mono">
-                      <div className="rounded-lg bg-white p-2.5 border border-indigo-100 dark:bg-slate-800 dark:border-indigo-900 shadow-xs">
-                        <span className="block text-[10px] text-slate-500 uppercase font-sans font-bold">Cód. Barras Bipado</span>
-                        <span className="font-black text-indigo-600 dark:text-indigo-300 text-sm truncate block">
-                          {parsed.codigo_barras || scanResult.code}
-                        </span>
-                      </div>
-                      <div className="rounded-lg bg-white p-2.5 border border-indigo-100 dark:bg-slate-800 dark:border-indigo-900 shadow-xs">
-                        <span className="block text-[10px] text-slate-500 uppercase font-sans font-bold">Código Extraído / Fábrica</span>
-                        <span className="font-black text-slate-900 dark:text-white text-sm truncate block">
-                          {parsed.codigo_extraido || parsed.codigo_fabrica || '—'}
-                        </span>
-                      </div>
-                      <div className="rounded-lg bg-white p-2.5 border border-indigo-100 dark:bg-slate-800 dark:border-indigo-900 shadow-xs">
-                        <span className="block text-[10px] text-slate-500 uppercase font-sans font-bold">Tipo da Peça</span>
-                        <span className="font-black text-amber-700 dark:text-amber-400 text-xs truncate block font-sans">
-                          {parsed.tipo_peca || 'Peça Automotiva'}
-                        </span>
+                    <div className="flex flex-col sm:flex-row gap-3 items-start">
+                      {parsed.thumbnail && (
+                        <div className="w-16 h-16 rounded-lg bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-800 p-1 shrink-0 flex items-center justify-center overflow-hidden shadow-xs">
+                          <img src={parsed.thumbnail} alt={parsed.descricao_sugerida} className="max-w-full max-h-full object-contain" />
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs font-mono flex-1 w-full">
+                        <div className="rounded-lg bg-white p-2.5 border border-slate-200 dark:bg-slate-800 dark:border-slate-700 shadow-xs">
+                          <span className="block text-[10px] text-slate-500 uppercase font-sans font-bold">Cód. Barras Bipado</span>
+                          <span className="font-black text-indigo-600 dark:text-indigo-300 text-sm truncate block">
+                            {parsed.codigo_barras || scanResult.code}
+                          </span>
+                        </div>
+                        <div className="rounded-lg bg-white p-2.5 border border-slate-200 dark:bg-slate-800 dark:border-slate-700 shadow-xs">
+                          <span className="block text-[10px] text-slate-500 uppercase font-sans font-bold">Código Extraído / Fábrica</span>
+                          <span className="font-black text-slate-900 dark:text-white text-sm truncate block">
+                            {parsed.codigo_extraido || parsed.codigo_fabrica || '—'}
+                          </span>
+                        </div>
+                        <div className="rounded-lg bg-white p-2.5 border border-slate-200 dark:bg-slate-800 dark:border-slate-700 shadow-xs">
+                          <span className="block text-[10px] text-slate-500 uppercase font-sans font-bold">Origem dos Dados</span>
+                          <span className={`font-black text-xs truncate block font-sans ${isFromCosmos ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400'}`}>
+                            {isFromCosmos ? 'Bluesoft Cosmos (Catálogo Oficial)' : (parsed.tipo_peca || 'Regra Heurística')}
+                          </span>
+                        </div>
                       </div>
                     </div>
 
                     {parsed.descricao_sugerida && (
-                      <div className="mt-2.5 text-[11px] text-indigo-950 dark:text-indigo-200 bg-white/70 dark:bg-slate-800/80 p-2 rounded-lg border border-indigo-100 dark:border-indigo-900">
-                        <span className="font-bold text-indigo-600 dark:text-indigo-400">Sugestão de Descrição: </span>
-                        <span className="font-semibold">{parsed.descricao_sugerida}</span>
+                      <div className={`mt-2.5 text-[11px] p-2.5 rounded-lg border flex items-center justify-between gap-2 flex-wrap ${
+                        isFromCosmos 
+                          ? 'bg-white/80 dark:bg-slate-800/90 border-emerald-200 dark:border-emerald-800 text-emerald-950 dark:text-emerald-200' 
+                          : 'bg-white/70 dark:bg-slate-800/80 border-indigo-100 dark:border-indigo-900 text-indigo-950 dark:text-indigo-200'
+                      }`}>
+                        <div className="flex-1">
+                          <span className={`font-bold ${isFromCosmos ? 'text-emerald-700 dark:text-emerald-400' : 'text-indigo-600 dark:text-indigo-400'}`}>
+                            {isFromCosmos ? 'Descrição Oficial (Cosmos): ' : 'Sugestão de Descrição: '}
+                          </span>
+                          <span className="font-semibold">{parsed.descricao_sugerida}</span>
+                        </div>
+
+                        {!isFromCosmos && (
+                          <button
+                            type="button"
+                            disabled={isQueryingCosmos}
+                            onClick={() => handleConsultarCosmos(parsed.codigo_barras || scanResult.code)}
+                            className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 hover:text-indigo-900 dark:text-indigo-300 dark:hover:text-indigo-100 bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-900/50 px-2 py-1 rounded transition disabled:opacity-50"
+                          >
+                            <RefreshCw className={`h-3 w-3 ${isQueryingCosmos ? 'animate-spin' : ''}`} />
+                            <span>{isQueryingCosmos ? 'Consultando Cosmos...' : 'Consultar no Cosmos'}</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {cosmosWarning && (
+                      <div className="mt-2 rounded-lg bg-amber-50/80 px-3 py-1.5 text-[11px] font-medium text-amber-900 border border-amber-200/70 dark:bg-amber-950/30 dark:border-amber-900/50 dark:text-amber-300 flex items-center gap-2">
+                        <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-500 shrink-0" />
+                        <span>{cosmosWarning}</span>
                       </div>
                     )}
                   </div>
@@ -1565,14 +1690,34 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1">
-                        Descrição da Mercadoria (opcional)
-                      </label>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
+                          Descrição da Mercadoria (opcional)
+                        </label>
+                        {(() => {
+                          const parsed: any = scanResult.identifiedInfo || parseScannedLabel(scanResult.code);
+                          if (parsed.origem === 'Bluesoft Cosmos') {
+                            return (
+                              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded">
+                                ✓ Preenchido automaticamente (Cosmos)
+                              </span>
+                            );
+                          }
+                          if (cosmosWarning) {
+                            return (
+                              <span className="text-[10px] text-amber-700 dark:text-amber-400 font-medium">
+                                Digite a descrição (cota de 25 bipes atingida)
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </div>
                       <input
                         type="text"
                         value={inlineDescricao}
                         onChange={e => setInlineDescricao(e.target.value)}
-                        placeholder="Ex: JUNTA, CABEÇOTE MOTOR (MWM)"
+                        placeholder="Ex: PARAFUSO CABECOTE - MT VW AP 1.6L/1.8L"
                         className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                       />
                     </div>

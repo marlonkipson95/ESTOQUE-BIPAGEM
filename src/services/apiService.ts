@@ -433,6 +433,37 @@ class ApiService {
     }
     return await res.json();
   }
+
+  // =====================================
+  // CONSULTA EXTERNA BLUESOFT COSMOS (GTIN / EAN)
+  // =====================================
+
+  async consultarCosmos(gtin: string): Promise<{
+    success: boolean;
+    status: number;
+    data: {
+      gtin: string | number;
+      description: string;
+      brand?: string;
+      ncm?: string;
+      thumbnail?: string;
+    } | null;
+    message?: string;
+  }> {
+    try {
+      const clean = (gtin || '').trim().replace(/[\s\.-]/g, '');
+      const res = await fetch(`${this.baseUrl}/cosmos/gtin/${encodeURIComponent(clean)}`);
+      const data = await res.json();
+      return data;
+    } catch (err: any) {
+      return {
+        success: false,
+        status: 500,
+        data: null,
+        message: err.message || 'Falha de comunicação com o servidor ao consultar Cosmos.',
+      };
+    }
+  }
 }
 
 export const apiService = new ApiService();
