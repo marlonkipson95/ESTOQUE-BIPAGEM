@@ -1,4 +1,4 @@
-import { Product, ProductCodeHistory, DashboardStats, DatabaseHealth } from '../types';
+import { Product, ProductCodeHistory, DashboardStats, DatabaseHealth, QuickList, QuickListItem } from '../types';
 
 class ApiService {
   private baseUrl = '/api';
@@ -464,6 +464,82 @@ class ApiService {
       };
     }
   }
+
+  // =====================================
+  // ANOTAÇÕES RÁPIDAS / LISTAS RÁPIDAS
+  // =====================================
+
+  async getListasRapidas(): Promise<QuickList[]> {
+    try {
+      const res = await fetch(`${this.baseUrl}/listas-rapidas`);
+      if (!res.ok) throw new Error('Falha ao carregar listas rápidas');
+      return await res.json();
+    } catch (err: any) {
+      console.error('[ApiService] Erro ao buscar listas rápidas:', err);
+      return [];
+    }
+  }
+
+  async getListaRapidaById(id: number): Promise<QuickList | null> {
+    try {
+      const res = await fetch(`${this.baseUrl}/listas-rapidas/${id}`);
+      if (!res.ok) throw new Error('Lista não encontrada');
+      return await res.json();
+    } catch (err: any) {
+      console.error('[ApiService] Erro ao buscar lista por ID:', err);
+      return null;
+    }
+  }
+
+  async salvarListaRapida(lista: Partial<QuickList>): Promise<{ success: boolean; lista?: QuickList; error?: string }> {
+    try {
+      const res = await fetch(`${this.baseUrl}/listas-rapidas`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(lista),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Erro ao salvar lista rápida');
+      }
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  async excluirListaRapida(id: number): Promise<{ success: boolean; error?: string }> {
+    try {
+      const res = await fetch(`${this.baseUrl}/listas-rapidas/${id}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Erro ao excluir lista rápida');
+      }
+      return await res.json();
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
+  }
+
+  async lookupItemRapido(code: string): Promise<{
+    found: boolean;
+    codigo?: string;
+    descricao?: string;
+    locacao?: string;
+    quantidade?: number;
+  }> {
+    try {
+      const clean = encodeURIComponent((code || '').trim());
+      const res = await fetch(`${this.baseUrl}/listas-rapidas/lookup-item/${clean}`);
+      if (!res.ok) return { found: false };
+      return await res.json();
+    } catch {
+      return { found: false };
+    }
+  }
 }
 
 export const apiService = new ApiService();
+

@@ -13,6 +13,7 @@ import {
   User,
   Calculator,
   ShieldCheck,
+  ClipboardList,
 } from 'lucide-react';
 import { AppModule, SystemUser } from '../../types';
 
@@ -40,14 +41,15 @@ export const MobileNav: React.FC<MobileNavProps> = ({
   const bottomItems: { id: AppModule; label: string; icon: React.ElementType }[] = [
     { id: 'bipagem', label: 'Bipar', icon: Barcode },
     { id: 'consulta', label: 'Consultar', icon: Search },
-    { id: 'produtos', label: 'Produtos', icon: Boxes },
+    { id: 'anotacoes', label: 'Anotações', icon: ClipboardList },
     { id: 'orcamento', label: 'Orçamentos', icon: Calculator },
-    { id: 'dashboard', label: 'Painel', icon: LayoutDashboard },
+    { id: 'produtos', label: 'Produtos', icon: Boxes },
   ];
 
   const allModules: { id: AppModule; label: string; desc: string; icon: React.ElementType }[] = [
     { id: 'bipagem', label: 'Bipar / Localizar', desc: 'Identificar produto e ver prateleira física', icon: Barcode },
     { id: 'consulta', label: 'Consulta de Produtos', desc: 'Busca rápida e filtros avançados', icon: Search },
+    { id: 'anotacoes', label: 'Anotações Rápidas', desc: 'Listas operacionais de contagem e conferência', icon: ClipboardList },
     { id: 'produtos', label: 'Catálogo de Produtos', desc: `${totalProductsCount} itens cadastrados`, icon: Boxes },
     { id: 'orcamento', label: 'Criar Orçamento', desc: 'Simular valores e distribuir descontos', icon: Calculator },
     { id: 'auditoria', label: 'Auditoria & Reversão', desc: 'Histórico de edições e reversão', icon: ShieldCheck },

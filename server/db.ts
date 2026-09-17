@@ -213,6 +213,19 @@ export async function initDatabaseSchema(): Promise<void> {
       );
     `);
 
+    // 6c. Tabela listas_rapidas (Anotações e listas operacionais)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS listas_rapidas (
+        id SERIAL PRIMARY KEY,
+        nome VARCHAR(150) NOT NULL,
+        responsavel VARCHAR(100) DEFAULT 'Estoque',
+        itens JSONB NOT NULL DEFAULT '[]'::jsonb,
+        total_itens INTEGER DEFAULT 0,
+        criado_em TIMESTAMPTZ DEFAULT NOW(),
+        atualizado_em TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
     // 7. Índices para alta performance e unicidade
     await client.query(`
       CREATE INDEX IF NOT EXISTS idx_produtos_codigo_atual ON produtos(codigo_atual);

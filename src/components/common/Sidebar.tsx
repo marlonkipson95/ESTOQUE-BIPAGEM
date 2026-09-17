@@ -14,6 +14,7 @@ import {
   LogOut,
   User,
   Calculator,
+  ClipboardList,
 } from 'lucide-react';
 import { AppModule, SystemUser } from '../../types';
 
@@ -44,6 +45,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'bipagem', label: 'Bipar / Localizar', icon: Barcode, highlight: true },
     { id: 'consulta', label: 'Consulta Estoque', icon: Search },
     { id: 'produtos', label: 'Produtos Cadastrados', icon: Boxes, badge: totalProductsCount },
+    { id: 'anotacoes', label: 'Anotações Rápidas', icon: ClipboardList },
     { id: 'orcamento', label: 'Orçamentos', icon: Calculator },
     { id: 'auditoria', label: 'Auditoria & Reversão', icon: ShieldCheck },
     { id: 'dashboard', label: 'Painel Geral', icon: LayoutDashboard },

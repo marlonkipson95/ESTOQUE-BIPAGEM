@@ -196,9 +196,29 @@ export type AppModule =
   | 'consulta'
   | 'produtos'
   | 'orcamento'
+  | 'anotacoes'
   | 'auditoria'
   | 'usuarios'
   | 'importacao';
+
+export interface QuickListItem {
+  id: string;
+  codigo: string;
+  locacao?: string;
+  comentario?: string;
+  cadastrado?: boolean;
+  criado_em?: string;
+}
+
+export interface QuickList {
+  id?: number;
+  nome: string;
+  responsavel?: string;
+  itens: QuickListItem[];
+  total_itens?: number;
+  criado_em?: string;
+  atualizado_em?: string;
+}
 
 export interface AuditoriaRecord {
   id: number;

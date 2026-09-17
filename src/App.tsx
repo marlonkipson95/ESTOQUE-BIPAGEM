@@ -28,6 +28,7 @@ import { BipagemView } from './components/bipagem/BipagemView';
 import { ProdutosView } from './components/produtos/ProdutosView';
 import { ImportacaoView } from './components/importacao/ImportacaoView';
 import { OrcamentoView } from './components/orcamento/OrcamentoView';
+import { AnotacoesView } from './components/anotacoes/AnotacoesView';
 import { AuditoriaView } from './components/auditoria/AuditoriaView';
 import { UsuariosView } from './components/usuarios/UsuariosView';
 import { ChatAssistant } from './components/chat/ChatAssistant';
@@ -263,6 +264,14 @@ export default function App() {
           {activeModule === 'orcamento' && (
             <OrcamentoView 
               products={products}
+              onOpenQuickScan={() => setIsCameraScannerOpen(true)}
+              externalScannedCode={incomingScannedCode}
+              onClearExternalScannedCode={() => setIncomingScannedCode('')}
+            />
+          )}
+
+          {activeModule === 'anotacoes' && (
+            <AnotacoesView
               onOpenQuickScan={() => setIsCameraScannerOpen(true)}
               externalScannedCode={incomingScannedCode}
               onClearExternalScannedCode={() => setIncomingScannedCode('')}
