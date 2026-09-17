@@ -629,7 +629,7 @@ export async function processChatMessage(message: string, sessionId: string): Pr
       const totalSemLoc = parseInt(countRes.rows[0]?.total, 10) || 0;
 
       const res = await client.query(`
-        SELECT id, codigo_atual, codigo_fabrica, codigo_barras_atual, descricao, quantidade, preco_sugerido
+        SELECT id, codigo_atual, codigo_fabrica, codigo_barras_atual, descricao, quantidade, preco_sugerido, preco_minimo, preco_tabela
         FROM produtos
         WHERE (locacao IS NULL OR TRIM(locacao) = '' OR TRIM(locacao) ILIKE 'sem loc%' OR TRIM(locacao) ILIKE 'sem local%')
           AND (corredor IS NULL OR TRIM(corredor) = '')
@@ -642,17 +642,18 @@ export async function processChatMessage(message: string, sessionId: string): Pr
       }
 
       let reply = `📍 **Itens Sem Locação Física Atribuída** (${totalSemLoc.toLocaleString('pt-BR')} itens no total):\n\n`;
-      reply += `*Exibindo os primeiros 25 itens ordenados por estoque:*\n\n`;
-      reply += `| Cód. Produto | ID Sistema | Descrição | Estoque | Preço Sugerido |\n`;
-      reply += `| :--- | :---: | :--- | :---: | :---: |\n`;
+      reply += `*Exibindo os primeiros 25 itens ordenados por volume:*\n\n`;
+      reply += `| Cód. Produto | Descrição | Preço Mínimo | Preço Sugerido | Preço Tabela |\n`;
+      reply += `| :--- | :--- | :---: | :---: | :---: |\n`;
 
       res.rows.forEach(p => {
         const codProd = (p.codigo_fabrica && p.codigo_fabrica.trim() !== '' && !p.codigo_fabrica.startsWith('PRD-'))
           ? p.codigo_fabrica
           : (p.codigo_atual && !p.codigo_atual.startsWith('PRD-') ? p.codigo_atual : (p.codigo_barras_atual || p.id));
-        const idSis = p.id || '—';
-        const preco = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
-        reply += `| **${codProd}** | \`${idSis}\` | ${p.descricao} | ${p.quantidade} un | ${preco} |\n`;
+        const pMin = p.preco_minimo ? formatMoney(parseFloat(p.preco_minimo)) : '—';
+        const pSug = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
+        const pTab = p.preco_tabela ? formatMoney(parseFloat(p.preco_tabela)) : '—';
+        reply += `| **${codProd}** | ${p.descricao} | ${pMin} | ${pSug} | ${pTab} |\n`;
       });
 
       reply += `\n💡 Para definir a locação de qualquer uma dessas peças, digite:\n\`altere a locação do item [CÓDIGO] para corredor X, baia Y, nivel Z\``;
@@ -674,34 +675,39 @@ export async function processChatMessage(message: string, sessionId: string): Pr
     try {
       const countRes = await client.query(`
         SELECT COUNT(*) as total FROM produtos 
-        WHERE preco_sugerido IS NULL OR preco_sugerido = 0
+        WHERE (preco_sugerido IS NULL OR preco_sugerido = 0)
+          AND (preco_minimo IS NULL OR preco_minimo = 0)
       `);
       const totalSemPreco = parseInt(countRes.rows[0]?.total, 10) || 0;
 
       const res = await client.query(`
-        SELECT id, codigo_atual, codigo_fabrica, codigo_barras_atual, descricao, corredor, baia, nivel, locacao, quantidade
+        SELECT id, codigo_atual, codigo_fabrica, codigo_barras_atual, descricao, corredor, baia, nivel, locacao,
+               preco_sugerido, preco_minimo, preco_tabela
         FROM produtos
-        WHERE preco_sugerido IS NULL OR preco_sugerido = 0
-        ORDER BY quantidade DESC, codigo_atual ASC
+        WHERE (preco_sugerido IS NULL OR preco_sugerido = 0)
+          AND (preco_minimo IS NULL OR preco_minimo = 0)
+        ORDER BY codigo_atual ASC
         LIMIT 25
       `);
 
       if (totalSemPreco === 0) {
-        return '✅ Todos os produtos cadastrados possuem preço sugerido configurado!';
+        return '✅ Todos os produtos cadastrados possuem preços configurados!';
       }
 
-      let reply = `💵 **Itens Sem Preço Sugerido Cadastrado** (${totalSemPreco.toLocaleString('pt-BR')} itens no total):\n\n`;
+      let reply = `💵 **Itens Sem Preço Cadastrado** (${totalSemPreco.toLocaleString('pt-BR')} itens no total):\n\n`;
       reply += `*Exibindo os primeiros 25 itens:*\n\n`;
-      reply += `| Cód. Produto | ID Sistema | Descrição | Locação | Estoque |\n`;
-      reply += `| :--- | :---: | :--- | :---: | :---: |\n`;
+      reply += `| Cód. Produto | Descrição | Locação | Preço Mínimo | Preço Sugerido | Preço Tabela |\n`;
+      reply += `| :--- | :--- | :---: | :---: | :---: | :---: |\n`;
 
       res.rows.forEach(p => {
         const codProd = (p.codigo_fabrica && p.codigo_fabrica.trim() !== '' && !p.codigo_fabrica.startsWith('PRD-'))
           ? p.codigo_fabrica
           : (p.codigo_atual && !p.codigo_atual.startsWith('PRD-') ? p.codigo_atual : (p.codigo_barras_atual || p.id));
-        const idSis = p.id || '—';
         const loc = p.locacao || [p.corredor, p.baia, p.nivel].filter(Boolean).join('-') || 'Sem locação';
-        reply += `| **${codProd}** | \`${idSis}\` | ${p.descricao} | \`${loc}\` | ${p.quantidade} un |\n`;
+        const pMin = p.preco_minimo ? formatMoney(parseFloat(p.preco_minimo)) : '—';
+        const pSug = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
+        const pTab = p.preco_tabela ? formatMoney(parseFloat(p.preco_tabela)) : '—';
+        reply += `| **${codProd}** | ${p.descricao} | \`${loc}\` | ${pMin} | ${pSug} | ${pTab} |\n`;
       });
 
       reply += `\n💡 Para cadastrar o preço de qualquer item, digite:\n\`altere o preço sugerido do item [CÓDIGO] para [VALOR]\``;
@@ -769,7 +775,8 @@ export async function processChatMessage(message: string, sessionId: string): Pr
         const bFim = parseInt(baiaRangeMatch[2], 10);
 
         const res = await client.query(`
-          SELECT id, codigo_atual, codigo_fabrica, codigo_barras_atual, descricao, corredor, baia, nivel, locacao, quantidade, preco_sugerido
+          SELECT id, codigo_atual, codigo_fabrica, codigo_barras_atual, descricao, corredor, baia, nivel, locacao,
+                 preco_sugerido, preco_minimo, preco_tabela
           FROM produtos
           WHERE UPPER(TRIM(corredor)) = UPPER($1)
             AND NULLIF(regexp_replace(baia, '\\D', '', 'g'), '')::integer BETWEEN $2 AND $3
@@ -782,15 +789,16 @@ export async function processChatMessage(message: string, sessionId: string): Pr
         }
 
         let reply = `📦 **Peças no Corredor ${targetCorredor} (Baias ${bIni} a ${bFim}):**\n\n`;
-        reply += `| Cód. Produto | ID Sistema | Descrição | Baia | Nível | Estoque | Preço Sugerido |\n`;
-        reply += `| :--- | :---: | :--- | :---: | :---: | :---: | :---: |\n`;
+        reply += `| Cód. Produto | Descrição | Baia | Nível | Preço Mínimo | Preço Sugerido | Preço Tabela |\n`;
+        reply += `| :--- | :--- | :---: | :---: | :---: | :---: | :---: |\n`;
         res.rows.forEach(p => {
           const codProd = (p.codigo_fabrica && p.codigo_fabrica.trim() !== '' && !p.codigo_fabrica.startsWith('PRD-'))
             ? p.codigo_fabrica
             : (p.codigo_atual && !p.codigo_atual.startsWith('PRD-') ? p.codigo_atual : (p.codigo_barras_atual || p.id));
-          const idSis = p.id || '—';
-          const preco = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
-          reply += `| **${codProd}** | \`${idSis}\` | ${p.descricao} | \`${p.baia || '—'}\` | ${p.nivel || '—'} | ${p.quantidade} un | ${preco} |\n`;
+          const pMin = p.preco_minimo ? formatMoney(parseFloat(p.preco_minimo)) : '—';
+          const pSug = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
+          const pTab = p.preco_tabela ? formatMoney(parseFloat(p.preco_tabela)) : '—';
+          reply += `| **${codProd}** | ${p.descricao} | \`${p.baia || '—'}\` | ${p.nivel || '—'} | ${pMin} | ${pSug} | ${pTab} |\n`;
         });
         return reply;
       }
@@ -823,7 +831,7 @@ export async function processChatMessage(message: string, sessionId: string): Pr
         }
 
         const res = await client.query(`
-          SELECT id, codigo_atual, codigo_fabrica, codigo_barras_atual, descricao, corredor, baia, nivel, locacao, quantidade,
+          SELECT id, codigo_atual, codigo_fabrica, codigo_barras_atual, descricao, corredor, baia, nivel, locacao,
                  preco_sugerido, preco_minimo, preco_tabela
           FROM produtos
           WHERE UPPER(TRIM(corredor)) = UPPER($1)
@@ -837,45 +845,18 @@ export async function processChatMessage(message: string, sessionId: string): Pr
         }
 
         let reply = `💰 **Peças no Corredor ${targetCorredor} com ${priceLabel} entre ${formatMoney(pMin)} e ${formatMoney(pMax)}:**\n\n`;
-        if (priceCol === 'preco_minimo') {
-          reply += `| Cód. Produto | ID Sistema | Descrição | Locação | Estoque | Preço Mínimo | Preço Sugerido (Válido) |\n`;
-          reply += `| :--- | :---: | :--- | :---: | :---: | :---: | :---: |\n`;
-          res.rows.forEach(p => {
-            const codProd = (p.codigo_fabrica && p.codigo_fabrica.trim() !== '' && !p.codigo_fabrica.startsWith('PRD-'))
-              ? p.codigo_fabrica
-              : (p.codigo_atual && !p.codigo_atual.startsWith('PRD-') ? p.codigo_atual : (p.codigo_barras_atual || p.id));
-            const idSis = p.id || '—';
-            const loc = p.locacao || [p.corredor, p.baia, p.nivel].filter(Boolean).join('-') || 'Sem locação';
-            const pMinVal = p.preco_minimo ? formatMoney(parseFloat(p.preco_minimo)) : '—';
-            const pSugVal = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
-            reply += `| **${codProd}** | \`${idSis}\` | ${p.descricao} | \`${loc}\` | ${p.quantidade} un | **${pMinVal}** | ${pSugVal} |\n`;
-          });
-        } else if (priceCol === 'preco_tabela') {
-          reply += `| Cód. Produto | ID Sistema | Descrição | Locação | Estoque | Preço Tabela | Preço Sugerido (Válido) |\n`;
-          reply += `| :--- | :---: | :--- | :---: | :---: | :---: | :---: |\n`;
-          res.rows.forEach(p => {
-            const codProd = (p.codigo_fabrica && p.codigo_fabrica.trim() !== '' && !p.codigo_fabrica.startsWith('PRD-'))
-              ? p.codigo_fabrica
-              : (p.codigo_atual && !p.codigo_atual.startsWith('PRD-') ? p.codigo_atual : (p.codigo_barras_atual || p.id));
-            const idSis = p.id || '—';
-            const loc = p.locacao || [p.corredor, p.baia, p.nivel].filter(Boolean).join('-') || 'Sem locação';
-            const pTabVal = p.preco_tabela ? formatMoney(parseFloat(p.preco_tabela)) : '—';
-            const pSugVal = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
-            reply += `| **${codProd}** | \`${idSis}\` | ${p.descricao} | \`${loc}\` | ${p.quantidade} un | **${pTabVal}** | ${pSugVal} |\n`;
-          });
-        } else {
-          reply += `| Cód. Produto | ID Sistema | Descrição | Locação | Estoque | Preço Sugerido (Válido) |\n`;
-          reply += `| :--- | :---: | :--- | :---: | :---: | :---: |\n`;
-          res.rows.forEach(p => {
-            const codProd = (p.codigo_fabrica && p.codigo_fabrica.trim() !== '' && !p.codigo_fabrica.startsWith('PRD-'))
-              ? p.codigo_fabrica
-              : (p.codigo_atual && !p.codigo_atual.startsWith('PRD-') ? p.codigo_atual : (p.codigo_barras_atual || p.id));
-            const idSis = p.id || '—';
-            const loc = p.locacao || [p.corredor, p.baia, p.nivel].filter(Boolean).join('-') || 'Sem locação';
-            const preco = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
-            reply += `| **${codProd}** | \`${idSis}\` | ${p.descricao} | \`${loc}\` | ${p.quantidade} un | **${preco}** |\n`;
-          });
-        }
+        reply += `| Cód. Produto | Descrição | Locação | Preço Mínimo | Preço Sugerido | Preço Tabela |\n`;
+        reply += `| :--- | :--- | :---: | :---: | :---: | :---: |\n`;
+        res.rows.forEach(p => {
+          const codProd = (p.codigo_fabrica && p.codigo_fabrica.trim() !== '' && !p.codigo_fabrica.startsWith('PRD-'))
+            ? p.codigo_fabrica
+            : (p.codigo_atual && !p.codigo_atual.startsWith('PRD-') ? p.codigo_atual : (p.codigo_barras_atual || p.id));
+          const loc = p.locacao || [p.corredor, p.baia, p.nivel].filter(Boolean).join('-') || 'Sem locação';
+          const pMinVal = p.preco_minimo ? formatMoney(parseFloat(p.preco_minimo)) : '—';
+          const pSugVal = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
+          const pTabVal = p.preco_tabela ? formatMoney(parseFloat(p.preco_tabela)) : '—';
+          reply += `| **${codProd}** | ${p.descricao} | \`${loc}\` | ${pMinVal} | ${pSugVal} | ${pTabVal} |\n`;
+        });
         return reply;
       }
 
@@ -892,7 +873,8 @@ export async function processChatMessage(message: string, sessionId: string): Pr
 
       if (searchTermInCorredor && !searchTermInCorredor.toLowerCase().includes('listagem')) {
         const res = await client.query(`
-          SELECT id, codigo_atual, codigo_fabrica, codigo_barras_atual, descricao, corredor, baia, nivel, locacao, quantidade, preco_sugerido
+          SELECT id, codigo_atual, codigo_fabrica, codigo_barras_atual, descricao, corredor, baia, nivel, locacao,
+                 preco_sugerido, preco_minimo, preco_tabela
           FROM produtos
           WHERE UPPER(TRIM(corredor)) = UPPER($1)
             AND descricao ILIKE '%' || $2 || '%'
@@ -905,16 +887,17 @@ export async function processChatMessage(message: string, sessionId: string): Pr
         }
 
         let reply = `🔩 **Peças encontradas no Corredor ${targetCorredor} contendo "${searchTermInCorredor}":**\n\n`;
-        reply += `| Cód. Produto | ID Sistema | Descrição | Locação | Estoque | Preço Sugerido |\n`;
-        reply += `| :--- | :---: | :--- | :---: | :---: | :---: |\n`;
+        reply += `| Cód. Produto | Descrição | Locação | Preço Mínimo | Preço Sugerido | Preço Tabela |\n`;
+        reply += `| :--- | :--- | :---: | :---: | :---: | :---: |\n`;
         res.rows.forEach(p => {
           const codProd = (p.codigo_fabrica && p.codigo_fabrica.trim() !== '' && !p.codigo_fabrica.startsWith('PRD-'))
             ? p.codigo_fabrica
             : (p.codigo_atual && !p.codigo_atual.startsWith('PRD-') ? p.codigo_atual : (p.codigo_barras_atual || p.id));
-          const idSis = p.id || '—';
           const loc = p.locacao || [p.corredor, p.baia, p.nivel].filter(Boolean).join('-') || 'Sem locação';
-          const preco = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
-          reply += `| **${codProd}** | \`${idSis}\` | ${p.descricao} | \`${loc}\` | ${p.quantidade} un | ${preco} |\n`;
+          const pMin = p.preco_minimo ? formatMoney(parseFloat(p.preco_minimo)) : '—';
+          const pSug = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
+          const pTab = p.preco_tabela ? formatMoney(parseFloat(p.preco_tabela)) : '—';
+          reply += `| **${codProd}** | ${p.descricao} | \`${loc}\` | ${pMin} | ${pSug} | ${pTab} |\n`;
         });
         return reply;
       }
@@ -932,7 +915,8 @@ export async function processChatMessage(message: string, sessionId: string): Pr
       }
 
       const res = await client.query(`
-        SELECT id, codigo_atual, codigo_fabrica, codigo_barras_atual, descricao, corredor, baia, nivel, locacao, quantidade, preco_sugerido
+        SELECT id, codigo_atual, codigo_fabrica, codigo_barras_atual, descricao, corredor, baia, nivel, locacao,
+               preco_sugerido, preco_minimo, preco_tabela
         FROM produtos
         WHERE UPPER(TRIM(corredor)) = UPPER($1)
         ORDER BY baia ASC, nivel ASC, codigo_atual ASC
@@ -940,16 +924,17 @@ export async function processChatMessage(message: string, sessionId: string): Pr
       `, [targetCorredor]);
 
       let reply = `📋 **Listagem do Corredor ${targetCorredor}** (${totalCorredor.toLocaleString('pt-BR')} itens | ${totalEstoqueCorr} un):\n\n`;
-      reply += `| Cód. Produto | ID Sistema | Descrição | Baia | Nível | Estoque | Preço Sugerido |\n`;
-      reply += `| :--- | :---: | :--- | :---: | :---: | :---: | :---: |\n`;
+      reply += `| Cód. Produto | Descrição | Baia | Nível | Preço Mínimo | Preço Sugerido | Preço Tabela |\n`;
+      reply += `| :--- | :--- | :---: | :---: | :---: | :---: | :---: |\n`;
 
       res.rows.forEach(p => {
         const codProd = (p.codigo_fabrica && p.codigo_fabrica.trim() !== '' && !p.codigo_fabrica.startsWith('PRD-'))
           ? p.codigo_fabrica
           : (p.codigo_atual && !p.codigo_atual.startsWith('PRD-') ? p.codigo_atual : (p.codigo_barras_atual || p.id));
-        const idSis = p.id || '—';
-        const preco = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
-        reply += `| **${codProd}** | \`${idSis}\` | ${p.descricao} | \`${p.baia || '—'}\` | ${p.nivel || '—'} | ${p.quantidade} un | ${preco} |\n`;
+        const pMin = p.preco_minimo ? formatMoney(parseFloat(p.preco_minimo)) : '—';
+        const pSug = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
+        const pTab = p.preco_tabela ? formatMoney(parseFloat(p.preco_tabela)) : '—';
+        reply += `| **${codProd}** | ${p.descricao} | \`${p.baia || '—'}\` | ${p.nivel || '—'} | ${pMin} | ${pSug} | ${pTab} |\n`;
       });
 
       if (totalCorredor > 35) {
@@ -993,7 +978,7 @@ export async function processChatMessage(message: string, sessionId: string): Pr
     const client = await pool.connect();
     try {
       const res = await client.query(`
-        SELECT id, codigo_atual, codigo_fabrica, codigo_barras_atual, descricao, corredor, baia, nivel, locacao, quantidade,
+        SELECT id, codigo_atual, codigo_fabrica, codigo_barras_atual, descricao, corredor, baia, nivel, locacao,
                preco_sugerido, preco_minimo, preco_tabela
         FROM produtos
         WHERE ${priceCol} >= $1 AND ${priceCol} <= $2
@@ -1006,45 +991,18 @@ export async function processChatMessage(message: string, sessionId: string): Pr
       }
 
       let reply = `💰 **Peças no Estoque com ${priceLabel} entre ${formatMoney(pMin)} e ${formatMoney(pMax)}:**\n\n`;
-      if (priceCol === 'preco_minimo') {
-        reply += `| Cód. Produto | ID Sistema | Descrição | Locação | Estoque | Preço Mínimo | Preço Sugerido |\n`;
-        reply += `| :--- | :---: | :--- | :---: | :---: | :---: | :---: |\n`;
-        res.rows.forEach(p => {
-          const codProd = (p.codigo_fabrica && p.codigo_fabrica.trim() !== '' && !p.codigo_fabrica.startsWith('PRD-'))
-            ? p.codigo_fabrica
-            : (p.codigo_atual && !p.codigo_atual.startsWith('PRD-') ? p.codigo_atual : (p.codigo_barras_atual || p.id));
-          const idSis = p.id || '—';
-          const loc = p.locacao || [p.corredor, p.baia, p.nivel].filter(Boolean).join('-') || 'Sem locação';
-          const pMinVal = p.preco_minimo ? formatMoney(parseFloat(p.preco_minimo)) : '—';
-          const pSugVal = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
-          reply += `| **${codProd}** | \`${idSis}\` | ${p.descricao} | \`${loc}\` | ${p.quantidade} un | **${pMinVal}** | ${pSugVal} |\n`;
-        });
-      } else if (priceCol === 'preco_tabela') {
-        reply += `| Cód. Produto | ID Sistema | Descrição | Locação | Estoque | Preço Tabela | Preço Sugerido |\n`;
-        reply += `| :--- | :---: | :--- | :---: | :---: | :---: | :---: |\n`;
-        res.rows.forEach(p => {
-          const codProd = (p.codigo_fabrica && p.codigo_fabrica.trim() !== '' && !p.codigo_fabrica.startsWith('PRD-'))
-            ? p.codigo_fabrica
-            : (p.codigo_atual && !p.codigo_atual.startsWith('PRD-') ? p.codigo_atual : (p.codigo_barras_atual || p.id));
-          const idSis = p.id || '—';
-          const loc = p.locacao || [p.corredor, p.baia, p.nivel].filter(Boolean).join('-') || 'Sem locação';
-          const pTabVal = p.preco_tabela ? formatMoney(parseFloat(p.preco_tabela)) : '—';
-          const pSugVal = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
-          reply += `| **${codProd}** | \`${idSis}\` | ${p.descricao} | \`${loc}\` | ${p.quantidade} un | **${pTabVal}** | ${pSugVal} |\n`;
-        });
-      } else {
-        reply += `| Cód. Produto | ID Sistema | Descrição | Locação | Estoque | Preço Sugerido (Válido) |\n`;
-        reply += `| :--- | :---: | :--- | :---: | :---: | :---: |\n`;
-        res.rows.forEach(p => {
-          const codProd = (p.codigo_fabrica && p.codigo_fabrica.trim() !== '' && !p.codigo_fabrica.startsWith('PRD-'))
-            ? p.codigo_fabrica
-            : (p.codigo_atual && !p.codigo_atual.startsWith('PRD-') ? p.codigo_atual : (p.codigo_barras_atual || p.id));
-          const idSis = p.id || '—';
-          const loc = p.locacao || [p.corredor, p.baia, p.nivel].filter(Boolean).join('-') || 'Sem locação';
-          const preco = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
-          reply += `| **${codProd}** | \`${idSis}\` | ${p.descricao} | \`${loc}\` | ${p.quantidade} un | **${preco}** |\n`;
-        });
-      }
+      reply += `| Cód. Produto | Descrição | Locação | Preço Mínimo | Preço Sugerido | Preço Tabela |\n`;
+      reply += `| :--- | :--- | :---: | :---: | :---: | :---: |\n`;
+      res.rows.forEach(p => {
+        const codProd = (p.codigo_fabrica && p.codigo_fabrica.trim() !== '' && !p.codigo_fabrica.startsWith('PRD-'))
+          ? p.codigo_fabrica
+          : (p.codigo_atual && !p.codigo_atual.startsWith('PRD-') ? p.codigo_atual : (p.codigo_barras_atual || p.id));
+        const loc = p.locacao || [p.corredor, p.baia, p.nivel].filter(Boolean).join('-') || 'Sem locação';
+        const pMinVal = p.preco_minimo ? formatMoney(parseFloat(p.preco_minimo)) : '—';
+        const pSugVal = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
+        const pTabVal = p.preco_tabela ? formatMoney(parseFloat(p.preco_tabela)) : '—';
+        reply += `| **${codProd}** | ${p.descricao} | \`${loc}\` | ${pMinVal} | ${pSugVal} | ${pTabVal} |\n`;
+      });
       return reply;
     } finally {
       client.release();
@@ -1688,8 +1646,9 @@ export async function processChatMessage(message: string, sessionId: string): Pr
 
     const p = prods[0];
     const locStr = p.locacao || [p.corredor, p.baia, p.nivel].filter(Boolean).join('-') || 'Sem localização cadastrada';
-    const precoSug = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : 'Não informado';
     const precoMin = p.preco_minimo ? formatMoney(parseFloat(p.preco_minimo)) : 'Não informado';
+    const precoSug = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : 'Não informado';
+    const precoTab = p.preco_tabela ? formatMoney(parseFloat(p.preco_tabela)) : 'Não informado';
 
     return `🔍 **Dados do Produto Localizado no Banco:**\n\n` +
            `* **Código Interno:** \`${p.codigo_atual}\`\n` +
@@ -1697,7 +1656,7 @@ export async function processChatMessage(message: string, sessionId: string): Pr
            `* **Descrição:** ${p.descricao}\n` +
            `* **📍 Locação Física:** **Corredor ${p.corredor || '—'}, Baia ${p.baia || '—'}, Nível ${p.nivel || '—'}** (\`${locStr}\`)\n` +
            `* **📦 Estoque Físico:** **${p.quantidade}** unidades\n` +
-           `* **💵 Preço Sugerido:** ${precoSug} | **Preço Mínimo:** ${precoMin}\n` +
+           `* **💵 Preços:** Mínimo: **${precoMin}** | Sugerido: **${precoSug}** | Tabela: **${precoTab}**\n` +
            (p.codigos_alternativos ? `* **Códigos Alternativos/Genéricos:** ${p.codigos_alternativos}\n` : '') +
            `\nSe desejar gerar uma prévia de orçamento para este item, basta solicitar:\n` +
            `\`criar orçamento, [Vendedor], ${p.codigo_atual}, [Qtd] unidades\``;
