@@ -795,11 +795,18 @@ export async function processChatMessage(message: string, sessionId: string): Pr
         return reply;
       }
 
-      // 2. Corredor + Faixa de Preço (ex: "preço acima de 100 reais", "preço acima de 100 reais ate 200 reais", "entre 50 e 100")
-      const priceBetweenMatch = cleanMsg.match(/(?:entre|de)\s*(?:R\$\s*)?(\d+[.,]?\d*)\s*(?:e|ate|até|a)\s*(?:R\$\s*)?(\d+[.,]?\d*)/i);
-      const priceAboveMatch = cleanMsg.match(/pre[cç]o\s+(?:acima\s+de|maior\s+que|>)\s*(?:R\$\s*)?(\d+[.,]?\d*)(?:\s*(?:ate|até|e)\s*(?:R\$\s*)?(\d+[.,]?\d*))?/i);
+      // 2. Corredor + Faixa de Preço (ex: "preço acima de 100 reais", "preço minimo entre 50 a 60 reais", "preço tabela entre 10 e 20")
+      // Detectar tipo de preço: preco_minimo, preco_tabela ou preco_sugerido (válido)
+      const isMinPrice = /(?:pre[cç]o|preciso|valor)\s+m[ií]nimo|m[ií]nimo/i.test(cleanMsg);
+      const isTabPrice = /(?:pre[cç]o|preciso|valor)\s+tabela|tabela/i.test(cleanMsg);
+      const priceCol = isMinPrice ? 'preco_minimo' : (isTabPrice ? 'preco_tabela' : 'preco_sugerido');
+      const priceLabel = isMinPrice ? 'Preço Mínimo' : (isTabPrice ? 'Preço Tabela' : 'Preço Sugerido (Válido)');
 
-      if (priceBetweenMatch || priceAboveMatch) {
+      const priceBetweenMatch = cleanMsg.match(/(?:entre|de|faixa\s+de)\s*(?:R\$\s*)?(\d+[.,]?\d*)\s*(?:e|ate|até|a)\s*(?:R\$\s*)?(\d+[.,]?\d*)/i);
+      const priceAboveMatch = cleanMsg.match(/(?:pre[cç]o|preciso|valor)?\s*(?:acima\s+de|maior\s+que|>)\s*(?:R\$\s*)?(\d+[.,]?\d*)(?:\s*(?:ate|até|e|a)\s*(?:R\$\s*)?(\d+[.,]?\d*))?/i);
+      const priceBelowMatch = cleanMsg.match(/(?:pre[cç]o|preciso|valor)?\s*(?:abaixo\s+de|menor\s+que|<)\s*(?:R\$\s*)?(\d+[.,]?\d*)/i);
+
+      if (priceBetweenMatch || priceAboveMatch || priceBelowMatch) {
         let pMin = 0;
         let pMax = 999999;
 
@@ -811,33 +818,64 @@ export async function processChatMessage(message: string, sessionId: string): Pr
           if (priceAboveMatch[2]) {
             pMax = parseFloat(priceAboveMatch[2].replace(',', '.'));
           }
+        } else if (priceBelowMatch) {
+          pMax = parseFloat(priceBelowMatch[1].replace(',', '.'));
         }
 
         const res = await client.query(`
-          SELECT id, codigo_atual, codigo_fabrica, codigo_barras_atual, descricao, corredor, baia, nivel, locacao, quantidade, preco_sugerido
+          SELECT id, codigo_atual, codigo_fabrica, codigo_barras_atual, descricao, corredor, baia, nivel, locacao, quantidade,
+                 preco_sugerido, preco_minimo, preco_tabela
           FROM produtos
           WHERE UPPER(TRIM(corredor)) = UPPER($1)
-            AND preco_sugerido >= $2 AND preco_sugerido <= $3
-          ORDER BY preco_sugerido ASC
+            AND ${priceCol} >= $2 AND ${priceCol} <= $3
+          ORDER BY ${priceCol} ASC
           LIMIT 35
         `, [targetCorredor, pMin, pMax]);
 
         if (res.rows.length === 0) {
-          return `🔍 **Corredor ${targetCorredor}:** Nenhum item encontrado com preço entre ${formatMoney(pMin)} e ${formatMoney(pMax)}.`;
+          return `🔍 **Corredor ${targetCorredor}:** Nenhum item encontrado com **${priceLabel}** entre ${formatMoney(pMin)} e ${formatMoney(pMax)}.`;
         }
 
-        let reply = `💰 **Peças no Corredor ${targetCorredor} com Preço entre ${formatMoney(pMin)} e ${formatMoney(pMax)}:**\n\n`;
-        reply += `| Cód. Produto | ID Sistema | Descrição | Locação | Estoque | Preço Sugerido |\n`;
-        reply += `| :--- | :---: | :--- | :---: | :---: | :---: |\n`;
-        res.rows.forEach(p => {
-          const codProd = (p.codigo_fabrica && p.codigo_fabrica.trim() !== '' && !p.codigo_fabrica.startsWith('PRD-'))
-            ? p.codigo_fabrica
-            : (p.codigo_atual && !p.codigo_atual.startsWith('PRD-') ? p.codigo_atual : (p.codigo_barras_atual || p.id));
-          const idSis = p.id || '—';
-          const loc = p.locacao || [p.corredor, p.baia, p.nivel].filter(Boolean).join('-') || 'Sem locação';
-          const preco = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
-          reply += `| **${codProd}** | \`${idSis}\` | ${p.descricao} | \`${loc}\` | ${p.quantidade} un | **${preco}** |\n`;
-        });
+        let reply = `💰 **Peças no Corredor ${targetCorredor} com ${priceLabel} entre ${formatMoney(pMin)} e ${formatMoney(pMax)}:**\n\n`;
+        if (priceCol === 'preco_minimo') {
+          reply += `| Cód. Produto | ID Sistema | Descrição | Locação | Estoque | Preço Mínimo | Preço Sugerido (Válido) |\n`;
+          reply += `| :--- | :---: | :--- | :---: | :---: | :---: | :---: |\n`;
+          res.rows.forEach(p => {
+            const codProd = (p.codigo_fabrica && p.codigo_fabrica.trim() !== '' && !p.codigo_fabrica.startsWith('PRD-'))
+              ? p.codigo_fabrica
+              : (p.codigo_atual && !p.codigo_atual.startsWith('PRD-') ? p.codigo_atual : (p.codigo_barras_atual || p.id));
+            const idSis = p.id || '—';
+            const loc = p.locacao || [p.corredor, p.baia, p.nivel].filter(Boolean).join('-') || 'Sem locação';
+            const pMinVal = p.preco_minimo ? formatMoney(parseFloat(p.preco_minimo)) : '—';
+            const pSugVal = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
+            reply += `| **${codProd}** | \`${idSis}\` | ${p.descricao} | \`${loc}\` | ${p.quantidade} un | **${pMinVal}** | ${pSugVal} |\n`;
+          });
+        } else if (priceCol === 'preco_tabela') {
+          reply += `| Cód. Produto | ID Sistema | Descrição | Locação | Estoque | Preço Tabela | Preço Sugerido (Válido) |\n`;
+          reply += `| :--- | :---: | :--- | :---: | :---: | :---: | :---: |\n`;
+          res.rows.forEach(p => {
+            const codProd = (p.codigo_fabrica && p.codigo_fabrica.trim() !== '' && !p.codigo_fabrica.startsWith('PRD-'))
+              ? p.codigo_fabrica
+              : (p.codigo_atual && !p.codigo_atual.startsWith('PRD-') ? p.codigo_atual : (p.codigo_barras_atual || p.id));
+            const idSis = p.id || '—';
+            const loc = p.locacao || [p.corredor, p.baia, p.nivel].filter(Boolean).join('-') || 'Sem locação';
+            const pTabVal = p.preco_tabela ? formatMoney(parseFloat(p.preco_tabela)) : '—';
+            const pSugVal = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
+            reply += `| **${codProd}** | \`${idSis}\` | ${p.descricao} | \`${loc}\` | ${p.quantidade} un | **${pTabVal}** | ${pSugVal} |\n`;
+          });
+        } else {
+          reply += `| Cód. Produto | ID Sistema | Descrição | Locação | Estoque | Preço Sugerido (Válido) |\n`;
+          reply += `| :--- | :---: | :--- | :---: | :---: | :---: |\n`;
+          res.rows.forEach(p => {
+            const codProd = (p.codigo_fabrica && p.codigo_fabrica.trim() !== '' && !p.codigo_fabrica.startsWith('PRD-'))
+              ? p.codigo_fabrica
+              : (p.codigo_atual && !p.codigo_atual.startsWith('PRD-') ? p.codigo_atual : (p.codigo_barras_atual || p.id));
+            const idSis = p.id || '—';
+            const loc = p.locacao || [p.corredor, p.baia, p.nivel].filter(Boolean).join('-') || 'Sem locação';
+            const preco = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
+            reply += `| **${codProd}** | \`${idSis}\` | ${p.descricao} | \`${loc}\` | ${p.quantidade} un | **${preco}** |\n`;
+          });
+        }
         return reply;
       }
 
@@ -916,6 +954,96 @@ export async function processChatMessage(message: string, sessionId: string): Pr
 
       if (totalCorredor > 35) {
         reply += `\n*Exibindo os primeiros 35 itens do corredor. Você pode filtrar por baia digitando: "corredor ${targetCorredor}, baia 1 ate 10"*`;
+      }
+      return reply;
+    } finally {
+      client.release();
+    }
+  }
+
+  // H) Consulta Geral de Produtos por Faixa de Preço (sem corredor específico)
+  // Ex: "listagem dos produtos com preço minimo entre 50 a 60 reais", "produtos com preço sugerido acima de 500"
+  const globalPriceBetweenMatch = cleanMsg.match(/(?:entre|de|faixa\s+de)\s*(?:R\$\s*)?(\d+[.,]?\d*)\s*(?:e|ate|até|a)\s*(?:R\$\s*)?(\d+[.,]?\d*)/i);
+  const globalPriceAboveMatch = cleanMsg.match(/(?:pre[cç]o|preciso|valor)?\s*(?:acima\s+de|maior\s+que|>)\s*(?:R\$\s*)?(\d+[.,]?\d*)(?:\s*(?:ate|até|e|a)\s*(?:R\$\s*)?(\d+[.,]?\d*))?/i);
+  const globalPriceBelowMatch = cleanMsg.match(/(?:pre[cç]o|preciso|valor)?\s*(?:abaixo\s+de|menor\s+que|<)\s*(?:R\$\s*)?(\d+[.,]?\d*)/i);
+  const hasPriceMention = /(?:pre[cç]o|preciso|valor|reais|r\$)/i.test(cleanMsg) && (lower.includes('produto') || lower.includes('peça') || lower.includes('peca') || lower.includes('item') || lower.includes('listagem'));
+
+  if (!corredorMentionMatch && hasPriceMention && (globalPriceBetweenMatch || globalPriceAboveMatch || globalPriceBelowMatch) && !lower.startsWith('altere ') && !lower.startsWith('cadastre ')) {
+    let pMin = 0;
+    let pMax = 999999;
+
+    if (globalPriceBetweenMatch) {
+      pMin = parseFloat(globalPriceBetweenMatch[1].replace(',', '.'));
+      pMax = parseFloat(globalPriceBetweenMatch[2].replace(',', '.'));
+    } else if (globalPriceAboveMatch) {
+      pMin = parseFloat(globalPriceAboveMatch[1].replace(',', '.'));
+      if (globalPriceAboveMatch[2]) {
+        pMax = parseFloat(globalPriceAboveMatch[2].replace(',', '.'));
+      }
+    } else if (globalPriceBelowMatch) {
+      pMax = parseFloat(globalPriceBelowMatch[1].replace(',', '.'));
+    }
+
+    const isMinPrice = /(?:pre[cç]o|preciso|valor)\s+m[ií]nimo|m[ií]nimo/i.test(cleanMsg);
+    const isTabPrice = /(?:pre[cç]o|preciso|valor)\s+tabela|tabela/i.test(cleanMsg);
+    const priceCol = isMinPrice ? 'preco_minimo' : (isTabPrice ? 'preco_tabela' : 'preco_sugerido');
+    const priceLabel = isMinPrice ? 'Preço Mínimo' : (isTabPrice ? 'Preço Tabela' : 'Preço Sugerido (Válido)');
+
+    if (!pool) return '❌ Banco de dados desconectado.';
+    const client = await pool.connect();
+    try {
+      const res = await client.query(`
+        SELECT id, codigo_atual, codigo_fabrica, codigo_barras_atual, descricao, corredor, baia, nivel, locacao, quantidade,
+               preco_sugerido, preco_minimo, preco_tabela
+        FROM produtos
+        WHERE ${priceCol} >= $1 AND ${priceCol} <= $2
+        ORDER BY ${priceCol} ASC
+        LIMIT 35
+      `, [pMin, pMax]);
+
+      if (res.rows.length === 0) {
+        return `🔍 Nenhum produto encontrado no estoque com **${priceLabel}** entre ${formatMoney(pMin)} e ${formatMoney(pMax)}.`;
+      }
+
+      let reply = `💰 **Peças no Estoque com ${priceLabel} entre ${formatMoney(pMin)} e ${formatMoney(pMax)}:**\n\n`;
+      if (priceCol === 'preco_minimo') {
+        reply += `| Cód. Produto | ID Sistema | Descrição | Locação | Estoque | Preço Mínimo | Preço Sugerido |\n`;
+        reply += `| :--- | :---: | :--- | :---: | :---: | :---: | :---: |\n`;
+        res.rows.forEach(p => {
+          const codProd = (p.codigo_fabrica && p.codigo_fabrica.trim() !== '' && !p.codigo_fabrica.startsWith('PRD-'))
+            ? p.codigo_fabrica
+            : (p.codigo_atual && !p.codigo_atual.startsWith('PRD-') ? p.codigo_atual : (p.codigo_barras_atual || p.id));
+          const idSis = p.id || '—';
+          const loc = p.locacao || [p.corredor, p.baia, p.nivel].filter(Boolean).join('-') || 'Sem locação';
+          const pMinVal = p.preco_minimo ? formatMoney(parseFloat(p.preco_minimo)) : '—';
+          const pSugVal = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
+          reply += `| **${codProd}** | \`${idSis}\` | ${p.descricao} | \`${loc}\` | ${p.quantidade} un | **${pMinVal}** | ${pSugVal} |\n`;
+        });
+      } else if (priceCol === 'preco_tabela') {
+        reply += `| Cód. Produto | ID Sistema | Descrição | Locação | Estoque | Preço Tabela | Preço Sugerido |\n`;
+        reply += `| :--- | :---: | :--- | :---: | :---: | :---: | :---: |\n`;
+        res.rows.forEach(p => {
+          const codProd = (p.codigo_fabrica && p.codigo_fabrica.trim() !== '' && !p.codigo_fabrica.startsWith('PRD-'))
+            ? p.codigo_fabrica
+            : (p.codigo_atual && !p.codigo_atual.startsWith('PRD-') ? p.codigo_atual : (p.codigo_barras_atual || p.id));
+          const idSis = p.id || '—';
+          const loc = p.locacao || [p.corredor, p.baia, p.nivel].filter(Boolean).join('-') || 'Sem locação';
+          const pTabVal = p.preco_tabela ? formatMoney(parseFloat(p.preco_tabela)) : '—';
+          const pSugVal = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
+          reply += `| **${codProd}** | \`${idSis}\` | ${p.descricao} | \`${loc}\` | ${p.quantidade} un | **${pTabVal}** | ${pSugVal} |\n`;
+        });
+      } else {
+        reply += `| Cód. Produto | ID Sistema | Descrição | Locação | Estoque | Preço Sugerido (Válido) |\n`;
+        reply += `| :--- | :---: | :--- | :---: | :---: | :---: |\n`;
+        res.rows.forEach(p => {
+          const codProd = (p.codigo_fabrica && p.codigo_fabrica.trim() !== '' && !p.codigo_fabrica.startsWith('PRD-'))
+            ? p.codigo_fabrica
+            : (p.codigo_atual && !p.codigo_atual.startsWith('PRD-') ? p.codigo_atual : (p.codigo_barras_atual || p.id));
+          const idSis = p.id || '—';
+          const loc = p.locacao || [p.corredor, p.baia, p.nivel].filter(Boolean).join('-') || 'Sem locação';
+          const preco = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
+          reply += `| **${codProd}** | \`${idSis}\` | ${p.descricao} | \`${loc}\` | ${p.quantidade} un | **${preco}** |\n`;
+        });
       }
       return reply;
     } finally {
