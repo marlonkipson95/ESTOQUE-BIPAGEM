@@ -66,7 +66,20 @@ interface PendingProductCreation {
 
 const pendingProductCreations = new Map<string, PendingProductCreation>();
 
-// 4. Listas Rápidas Ativas por Sessão
+// 4. Vínculo de Código Genérico Pendente
+interface PendingGenericBinding {
+  sessionId: string;
+  targetProductId: string;
+  targetCodigo: string;
+  targetDescricao: string;
+  codigoGenerico: string;
+  similarProductId?: string;
+  similarDescricao?: string;
+}
+
+const pendingGenericBindings = new Map<string, PendingGenericBinding>();
+
+// 5. Listas Rápidas Ativas por Sessão
 interface QuickListItemChat {
   id: string;
   codigo: string;
@@ -85,7 +98,7 @@ interface ActiveQuickList {
 
 const activeQuickLists = new Map<string, ActiveQuickList>();
 
-// 5. Estados de Conversação (ex: aguardando nome da lista)
+// 6. Estados de Conversação (ex: aguardando nome da lista)
 const sessionFlowStates = new Map<string, { state: 'waiting_list_name'; data?: any }>();
 
 // ==========================================
@@ -121,7 +134,7 @@ function renderQuickListTable(list: ActiveQuickList): string {
     table += `\n`;
   }
 
-  table += `💡 **O que você pode fazer agora:**\n`;
+  table += `💡 **Ações disponíveis:**\n`;
   table += `• Adicionar item: \`código, locação, comentário\` ou \`item Y, tem apenas 2 no estoque\`\n`;
   table += `• Adicionar múltiplos: \`cadastre os itens X, Y, Z\`\n`;
   table += `• Alterar item: \`altere o comentario do item 1 para "caixa danificada"\`\n`;
@@ -146,7 +159,7 @@ async function searchProductDb(term: string): Promise<any[]> {
     const res = await client.query(
       `SELECT id, codigo_atual, codigo_fabrica, codigo_barras_atual, descricao,
               quantidade, corredor, baia, nivel, locacao,
-              preco_sugerido, preco_minimo, preco_tabela, custo_unitario
+              preco_sugerido, preco_minimo, preco_tabela, custo_unitario, codigos_alternativos
        FROM produtos 
        WHERE UPPER(codigo_atual) = UPPER($1)
           OR UPPER(codigo_fabrica) = UPPER($1)
@@ -172,7 +185,7 @@ async function searchProductDb(term: string): Promise<any[]> {
 }
 
 /**
- * Motor de interpretação de regras operacionais da Otto Diesel
+ * Motor de interpretação de regras operacionais e consultas verídicas da Otto Diesel
  */
 export async function processChatMessage(message: string, sessionId: string): Promise<string> {
   const cleanMsg = message.trim();
@@ -313,7 +326,6 @@ export async function processChatMessage(message: string, sessionId: string): Pr
       try {
         await client.query('BEGIN');
 
-        // Gerar ID do produto
         const newId = 'PRD-' + Date.now().toString().slice(-6);
 
         await client.query(
@@ -341,7 +353,6 @@ export async function processChatMessage(message: string, sessionId: string): Pr
           ]
         );
 
-        // Registro de Auditoria
         await client.query(
           `INSERT INTO historico_alteracoes (produto_id, campo, valor_anterior, valor_novo, motivo, usuario)
            VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -375,7 +386,63 @@ export async function processChatMessage(message: string, sessionId: string): Pr
       }
     }
 
-    return '⚠️ Não há nenhuma ação (orçamento, alteração ou cadastro) pendente de confirmação no momento.';
+    // D) Confirmação de Vínculo de Código Genérico
+    const pendingBinding = pendingGenericBindings.get(sessionId);
+    if (pendingBinding) {
+      const client = await pool.connect();
+      try {
+        await client.query('BEGIN');
+
+        // 1. Inserir em codigos_produto (tipo = 'codigo_generico')
+        await client.query(`
+          INSERT INTO codigos_produto (produto_id, tipo, codigo, motivo)
+          VALUES ($1, 'codigo_generico', $2, 'Vinculado via Assistente Inteligente')
+        `, [pendingBinding.targetProductId, pendingBinding.codigoGenerico]);
+
+        // 2. Atualizar produtos.codigos_alternativos
+        await client.query(`
+          UPDATE produtos 
+          SET codigos_alternativos = CASE 
+            WHEN codigos_alternativos IS NULL OR codigos_alternativos = '' THEN $1
+            ELSE codigos_alternativos || '; ' || $1
+          END,
+          atualizado_em = NOW()
+          WHERE id = $2
+        `, [pendingBinding.codigoGenerico, pendingBinding.targetProductId]);
+
+        // 3. Se o código genérico também for um produto cadastrado no sistema, criar o vínculo bidirecional em produtos_relacionados
+        if (pendingBinding.similarProductId && pendingBinding.similarProductId !== pendingBinding.targetProductId) {
+          await client.query(`
+            INSERT INTO produtos_relacionados (produto_id, relacionado_id, motivo)
+            VALUES ($1, $2, 'Similar / Genérico'), ($2, $1, 'Similar / Genérico')
+            ON CONFLICT DO NOTHING
+          `, [pendingBinding.targetProductId, pendingBinding.similarProductId]);
+        }
+
+        // 4. Registro de Auditoria
+        await client.query(`
+          INSERT INTO historico_alteracoes (produto_id, campo, valor_anterior, valor_novo, motivo, usuario)
+          VALUES ($1, 'codigo_generico', '', $2, 'Vínculo de código genérico via chat', 'Assistente OttoDiesel')
+        `, [pendingBinding.targetProductId, pendingBinding.codigoGenerico]);
+
+        await client.query('COMMIT');
+        pendingGenericBindings.delete(sessionId);
+
+        return `✅ **Código Genérico Vinculado com Sucesso no Banco de Dados!**\n\n` +
+               `* **Produto:** \`${pendingBinding.targetCodigo}\` (${pendingBinding.targetDescricao})\n` +
+               `* **Código Genérico Vinculado:** \`${pendingBinding.codigoGenerico}\`\n` +
+               (pendingBinding.similarProductId ? `* **Vínculo Intercambiável:** Vinculado como produto similar/relacionado a \`${pendingBinding.codigoGenerico}\`\n` : '') +
+               `\nAgora, qualquer busca ou bipagem por **"${pendingBinding.codigoGenerico}"** encontrará imediatamente esta peça no estoque!`;
+      } catch (err: any) {
+        await client.query('ROLLBACK');
+        console.error('[Chat] Erro ao vincular código genérico:', err);
+        return `❌ Erro ao vincular código genérico: ${err.message}`;
+      } finally {
+        client.release();
+      }
+    }
+
+    return '⚠️ Não há nenhuma ação (orçamento, alteração, cadastro ou vínculo) pendente de confirmação no momento.';
   }
 
   // -------------------------------------------------------------
@@ -395,6 +462,10 @@ export async function processChatMessage(message: string, sessionId: string): Pr
       pendingProductCreations.delete(sessionId);
       cancelled = true;
     }
+    if (pendingGenericBindings.has(sessionId)) {
+      pendingGenericBindings.delete(sessionId);
+      cancelled = true;
+    }
     if (sessionFlowStates.has(sessionId)) {
       sessionFlowStates.delete(sessionId);
       cancelled = true;
@@ -404,7 +475,6 @@ export async function processChatMessage(message: string, sessionId: string): Pr
       return '🗑️ Ação pendente cancelada e descartada com sucesso.';
     }
 
-    // Se estiver em lista rápida e pedir para descartar lista
     if (lower === 'descartar lista' && activeQuickLists.has(sessionId)) {
       activeQuickLists.delete(sessionId);
       return '🗑️ Rascunho da lista rápida descartado.';
@@ -414,7 +484,423 @@ export async function processChatMessage(message: string, sessionId: string): Pr
   }
 
   // -------------------------------------------------------------
-  // 3. ALTERAÇÃO DE ITEM DA LISTA RÁPIDA ATIVA
+  // 3. CONSULTAS ANALÍTICAS & OPERACIONAIS ESPECÍFICAS
+  // -------------------------------------------------------------
+
+  const pool = getDbPool();
+
+  // A) Quantidade de itens cadastrados em cada corredor
+  // Ex: "quatidade de item cadastrados em cada corredor", "total de peças por corredor", "resumo de corredores"
+  const isCorredorSummaryIntent = 
+    (lower.includes('quantidade') || lower.includes('quatidade') || lower.includes('total') || lower.includes('quantos')) &&
+    lower.includes('corredor') && 
+    (lower.includes('cada') || lower.includes('todos') || lower.includes('geral'));
+
+  if (isCorredorSummaryIntent) {
+    if (!pool) return '❌ Banco de dados desconectado.';
+    const client = await pool.connect();
+    try {
+      const res = await client.query(`
+        SELECT 
+          COALESCE(NULLIF(TRIM(corredor), ''), 'Sem Corredor') as corr,
+          COUNT(*) as total_prods,
+          SUM(COALESCE(quantidade, 0)) as total_estoque
+        FROM produtos
+        GROUP BY 1
+        ORDER BY 
+          CASE WHEN COALESCE(NULLIF(TRIM(corredor), ''), 'Sem Corredor') = 'Sem Corredor' THEN 2 ELSE 1 END,
+          corr ASC
+      `);
+
+      let totalGeral = 0;
+      let estoqueGeral = 0;
+
+      let reply = `📊 **Quantidade de Peças Cadastradas por Corredor:**\n\n`;
+      reply += `| Corredor | Peças Cadastradas | Estoque Físico Total |\n`;
+      reply += `| :---: | :---: | :---: |\n`;
+
+      res.rows.forEach(r => {
+        const pCount = parseInt(r.total_prods, 10) || 0;
+        const eCount = parseInt(r.total_estoque, 10) || 0;
+        totalGeral += pCount;
+        estoqueGeral += eCount;
+        reply += `| **${r.corr}** | ${pCount.toLocaleString('pt-BR')} itens | ${eCount.toLocaleString('pt-BR')} un |\n`;
+      });
+
+      reply += `\n📦 **Total Geral do Catálogo:** **${totalGeral.toLocaleString('pt-BR')} peças cadastradas** (${estoqueGeral.toLocaleString('pt-BR')} un em estoque físico).`;
+      return reply;
+    } finally {
+      client.release();
+    }
+  }
+
+  // B) Quantidade de itens/produtos com código genérico
+  // Ex: "quantidade de itens/produtos/peças com codigo generico", "quantos produtos tem codigo generico"
+  const isGenericCountIntent = 
+    (lower.includes('quantidade') || lower.includes('quatidade') || lower.includes('quantos') || lower.includes('total')) &&
+    (lower.includes('generico') || lower.includes('genérico') || lower.includes('alternativo'));
+
+  if (isGenericCountIntent) {
+    if (!pool) return '❌ Banco de dados desconectado.';
+    const client = await pool.connect();
+    try {
+      const resAlternativos = await client.query(`
+        SELECT COUNT(*) as total FROM produtos 
+        WHERE codigos_alternativos IS NOT NULL AND TRIM(codigos_alternativos) != ''
+      `);
+      const resRelacionados = await client.query(`
+        SELECT COUNT(DISTINCT produto_id) as total FROM produtos_relacionados
+      `);
+      const resCodigos = await client.query(`
+        SELECT COUNT(*) as total FROM codigos_produto 
+        WHERE tipo ILIKE '%generico%' OR tipo ILIKE '%alternativo%'
+      `);
+
+      const totalAlt = parseInt(resAlternativos.rows[0]?.total, 10) || 0;
+      const totalRel = parseInt(resRelacionados.rows[0]?.total, 10) || 0;
+      const totalCod = parseInt(resCodigos.rows[0]?.total, 10) || 0;
+
+      return `🔍 **Levantamento Oficial de Códigos Genéricos e Alternativos no Banco:**\n\n` +
+             `* **Peças com Códigos Alternativos/Genéricos Registrados:** **${totalAlt.toLocaleString('pt-BR')} produtos**\n` +
+             `* **Peças com Vínculos Diretos de Similaridade (Intercambiáveis):** **${totalRel.toLocaleString('pt-BR')} produtos**\n` +
+             `* **Total de Códigos Alternativos Mapeados no Histórico:** **${totalCod.toLocaleString('pt-BR')} códigos**\n\n` +
+             `💡 Para vincular um código genérico a uma peça agora mesmo, basta solicitar:\n` +
+             `\`vincular codigo generico [CÓDIGO], no produto codigo [CÓDIGO]\``;
+    } finally {
+      client.release();
+    }
+  }
+
+  // C) 10 Itens que mais aparecem nos orçamentos
+  // Ex: "listagem dos 10 itens que mais aparecem nos orçamentos", "peças mais orçadas"
+  const isTopBudgetItemsIntent = 
+    lower.includes('orçamento') || lower.includes('orcamento') || lower.includes('orçados') || lower.includes('orcados');
+  
+  if (isTopBudgetItemsIntent && (lower.includes('mais aparecem') || lower.includes('mais orçad') || lower.includes('mais orcad') || lower.includes('10 itens') || lower.includes('top 10') || lower.includes('mais frequentes'))) {
+    if (!pool) return '❌ Banco de dados desconectado.';
+    const client = await pool.connect();
+    try {
+      const res = await client.query(`
+        SELECT 
+          COALESCE(item->>'codigo_atual', item->>'codigo', '—') as codigo,
+          COALESCE(item->>'descricao', 'Sem descrição') as descricao,
+          COUNT(*) as vezes_orcado,
+          SUM(COALESCE((item->>'quantidade')::numeric, 1)) as total_qtd
+        FROM orcamentos,
+        LATERAL jsonb_array_elements(itens) as item
+        GROUP BY 1, 2
+        ORDER BY vezes_orcado DESC, total_qtd DESC
+        LIMIT 10
+      `);
+
+      if (res.rows.length === 0) {
+        return '📋 **Ranking de Peças nos Orçamentos:**\nAinda não há orçamentos suficientes gravados no banco de dados para gerar este relatório.';
+      }
+
+      let reply = `🏆 **Top 10 Itens Mais Frequentes nos Orçamentos:**\n\n`;
+      reply += `| # | Código | Descrição | Frequência em Orçamentos | Total de Unidades |\n`;
+      reply += `| :-: | :--- | :--- | :---: | :---: |\n`;
+
+      res.rows.forEach((r, idx) => {
+        reply += `| **${idx + 1}º** | **${r.codigo}** | ${r.descricao} | **${r.vezes_orcado}x** | ${parseInt(r.total_qtd, 10)} un |\n`;
+      });
+
+      return reply;
+    } finally {
+      client.release();
+    }
+  }
+
+  // D) Listagem de itens sem locação
+  // Ex: "listagem de itens sem locação", "produtos sem locacao"
+  const isWithoutLocationIntent = 
+    (lower.includes('sem loc') || lower.includes('sem local')) && 
+    (lower.includes('item') || lower.includes('peça') || lower.includes('peca') || lower.includes('produto') || lower.includes('listagem'));
+
+  if (isWithoutLocationIntent) {
+    if (!pool) return '❌ Banco de dados desconectado.';
+    const client = await pool.connect();
+    try {
+      const countRes = await client.query(`
+        SELECT COUNT(*) as total FROM produtos 
+        WHERE (locacao IS NULL OR TRIM(locacao) = '' OR TRIM(locacao) ILIKE 'sem loc%' OR TRIM(locacao) ILIKE 'sem local%')
+          AND (corredor IS NULL OR TRIM(corredor) = '')
+      `);
+      const totalSemLoc = parseInt(countRes.rows[0]?.total, 10) || 0;
+
+      const res = await client.query(`
+        SELECT codigo_atual, codigo_fabrica, descricao, quantidade, preco_sugerido
+        FROM produtos
+        WHERE (locacao IS NULL OR TRIM(locacao) = '' OR TRIM(locacao) ILIKE 'sem loc%' OR TRIM(locacao) ILIKE 'sem local%')
+          AND (corredor IS NULL OR TRIM(corredor) = '')
+        ORDER BY quantidade DESC, codigo_atual ASC
+        LIMIT 25
+      `);
+
+      if (totalSemLoc === 0) {
+        return '✅ **Excelente notícia:** Todos os produtos cadastrados no banco de dados já possuem localização física atribuída!';
+      }
+
+      let reply = `📍 **Itens Sem Locação Física Atribuída** (${totalSemLoc.toLocaleString('pt-BR')} itens no total):\n\n`;
+      reply += `*Exibindo os primeiros 25 itens ordenados por estoque:*\n\n`;
+      reply += `| Código | Descrição | Estoque | Preço Sugerido |\n`;
+      reply += `| :--- | :--- | :---: | :---: |\n`;
+
+      res.rows.forEach(p => {
+        const preco = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
+        reply += `| **${p.codigo_atual}** | ${p.descricao} | ${p.quantidade} un | ${preco} |\n`;
+      });
+
+      reply += `\n💡 Para definir a locação de qualquer uma dessas peças, digite:\n\`altere a locação do item [CÓDIGO] para corredor X, baia Y, nivel Z\``;
+      return reply;
+    } finally {
+      client.release();
+    }
+  }
+
+  // E) Listagem de itens sem preço
+  // Ex: "listagem de itens sem preço", "peças sem preco cadastrado"
+  const isWithoutPriceIntent = 
+    (lower.includes('sem pre') || lower.includes('sem valor')) && 
+    (lower.includes('item') || lower.includes('peça') || lower.includes('peca') || lower.includes('produto') || lower.includes('listagem'));
+
+  if (isWithoutPriceIntent) {
+    if (!pool) return '❌ Banco de dados desconectado.';
+    const client = await pool.connect();
+    try {
+      const countRes = await client.query(`
+        SELECT COUNT(*) as total FROM produtos 
+        WHERE preco_sugerido IS NULL OR preco_sugerido = 0
+      `);
+      const totalSemPreco = parseInt(countRes.rows[0]?.total, 10) || 0;
+
+      const res = await client.query(`
+        SELECT codigo_atual, descricao, corredor, baia, nivel, locacao, quantidade
+        FROM produtos
+        WHERE preco_sugerido IS NULL OR preco_sugerido = 0
+        ORDER BY quantidade DESC, codigo_atual ASC
+        LIMIT 25
+      `);
+
+      if (totalSemPreco === 0) {
+        return '✅ Todos os produtos cadastrados possuem preço sugerido configurado!';
+      }
+
+      let reply = `💵 **Itens Sem Preço Sugerido Cadastrado** (${totalSemPreco.toLocaleString('pt-BR')} itens no total):\n\n`;
+      reply += `*Exibindo os primeiros 25 itens:*\n\n`;
+      reply += `| Código | Descrição | Locação | Estoque |\n`;
+      reply += `| :--- | :--- | :---: | :---: |\n`;
+
+      res.rows.forEach(p => {
+        const loc = p.locacao || [p.corredor, p.baia, p.nivel].filter(Boolean).join('-') || 'Sem locação';
+        reply += `| **${p.codigo_atual}** | ${p.descricao} | \`${loc}\` | ${p.quantidade} un |\n`;
+      });
+
+      reply += `\n💡 Para cadastrar o preço de qualquer item, digite:\n\`altere o preço sugerido do item [CÓDIGO] para [VALOR]\``;
+      return reply;
+    } finally {
+      client.release();
+    }
+  }
+
+  // F) Vínculo de Código Genérico
+  // Ex: "colocar codigo generico Y no item X" ou "vincular codigo generico Y, no produto codigo X"
+  const genericBindingMatch = cleanMsg.match(/(?:colocar|vincular|adicionar|inserir)\s+(?:o\s+)?c[oó]digo\s+gen[eé]rico\s+([A-Za-z0-9\.-]+)(?:,?\s+no\s+(?:produto\s+(?:c[oó]digo\s+)?)?item\s+(?:c[oó]digo\s+)?|,\s*no\s+produto\s+c[oó]digo\s+|,?\s*no\s+c[oó]digo\s+)([A-Za-z0-9\.-]+)/i);
+  if (genericBindingMatch) {
+    const codGen = genericBindingMatch[1].trim();
+    const codTarget = genericBindingMatch[2].trim();
+
+    const prods = await searchProductDb(codTarget);
+    if (prods.length === 0) {
+      return `❌ **Produto Não Encontrado:** Não foi localizado nenhum produto com o código **"${codTarget}"** para vincular o código genérico.`;
+    }
+
+    const targetProd = prods[0];
+
+    // Verificar se o código genérico corresponde a outra peça já existente no banco
+    const similarProds = await searchProductDb(codGen);
+    const similarProd = similarProds.length > 0 ? similarProds[0] : null;
+
+    pendingGenericBindings.set(sessionId, {
+      sessionId,
+      targetProductId: targetProd.id,
+      targetCodigo: targetProd.codigo_atual,
+      targetDescricao: targetProd.descricao,
+      codigoGenerico: codGen,
+      similarProductId: similarProd ? similarProd.id : undefined,
+      similarDescricao: similarProd ? similarProd.descricao : undefined
+    });
+
+    return `🔗 **Confirmação de Vínculo de Código Genérico**\n\n` +
+           `* **Produto Principal:** \`${targetProd.codigo_atual}\` — ${targetProd.descricao}\n` +
+           `* **Código Genérico a Vincular:** \`${codGen}\`\n` +
+           (similarProd ? `* **Peça Similar no Estoque:** Reconhecida como \`${similarProd.codigo_atual}\` (${similarProd.descricao}) — Vínculo bidirecional\n` : '* **Tipo:** Código alternativo / genérico adicional\n') +
+           `\n---\n` +
+           `⚠️ Para efetivar a gravação deste código genérico no banco de dados, digite **CONFIRMAR**.\n` +
+           `*(Ou digite CANCELAR para descartar).*`;
+  }
+
+  // G) Consultas Específicas de Corredor (Corredor + Baia / Corredor + Preço / Corredor + Termo / Listagem Geral)
+  // Ex: "listagem do corredor B, baia 1 ate a 10"
+  // Ex: "listagem do corregor B item com preço acima de 100 reais"
+  // Ex: "listagem do corregor B item com preço acima de 100 reais ate 200 reais"
+  // Ex: "item no corredor N que sao parafusos" ou "itens parafuso corredor C"
+  // Ex: "quero a listagem do corredor M" ou "liste os item no corredor N"
+  const corredorMentionMatch = cleanMsg.match(/corredor\s+([A-Za-z0-9]+)/i) || cleanMsg.match(/corregor\s+([A-Za-z0-9]+)/i);
+
+  if (corredorMentionMatch && !lower.startsWith('altere ') && !lower.startsWith('cadastre ')) {
+    const targetCorredor = corredorMentionMatch[1].toUpperCase().trim();
+
+    if (!pool) return '❌ Banco de dados desconectado.';
+    const client = await pool.connect();
+    try {
+      // 1. Corredor + Faixa de Baias (ex: "baia 1 ate a 10" ou "baia 001 a 010")
+      const baiaRangeMatch = cleanMsg.match(/baia\s+(\d+)\s*(?:ate|até|a|-)\s*(?:a\s*)?(\d+)/i);
+      if (baiaRangeMatch) {
+        const bIni = parseInt(baiaRangeMatch[1], 10);
+        const bFim = parseInt(baiaRangeMatch[2], 10);
+
+        const res = await client.query(`
+          SELECT codigo_atual, codigo_fabrica, descricao, corredor, baia, nivel, locacao, quantidade, preco_sugerido
+          FROM produtos
+          WHERE UPPER(TRIM(corredor)) = UPPER($1)
+            AND NULLIF(regexp_replace(baia, '\\D', '', 'g'), '')::integer BETWEEN $2 AND $3
+          ORDER BY NULLIF(regexp_replace(baia, '\\D', '', 'g'), '')::integer ASC, nivel ASC
+          LIMIT 35
+        `, [targetCorredor, bIni, bFim]);
+
+        if (res.rows.length === 0) {
+          return `🔍 **Corredor ${targetCorredor} (Baias ${bIni} até ${bFim}):**\nNenhum produto cadastrado nesta faixa de baias no banco de dados.`;
+        }
+
+        let reply = `📦 **Peças no Corredor ${targetCorredor} (Baias ${bIni} a ${bFim}):**\n\n`;
+        reply += `| Código | Descrição | Baia | Nível | Estoque | Preço Sugerido |\n`;
+        reply += `| :--- | :--- | :---: | :---: | :---: | :---: |\n`;
+        res.rows.forEach(p => {
+          const preco = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
+          reply += `| **${p.codigo_atual}** | ${p.descricao} | \`${p.baia || '—'}\` | ${p.nivel || '—'} | ${p.quantidade} un | ${preco} |\n`;
+        });
+        return reply;
+      }
+
+      // 2. Corredor + Faixa de Preço (ex: "preço acima de 100 reais", "preço acima de 100 reais ate 200 reais", "entre 50 e 100")
+      const priceBetweenMatch = cleanMsg.match(/(?:entre|de)\s*(?:R\$\s*)?(\d+[.,]?\d*)\s*(?:e|ate|até|a)\s*(?:R\$\s*)?(\d+[.,]?\d*)/i);
+      const priceAboveMatch = cleanMsg.match(/pre[cç]o\s+(?:acima\s+de|maior\s+que|>)\s*(?:R\$\s*)?(\d+[.,]?\d*)(?:\s*(?:ate|até|e)\s*(?:R\$\s*)?(\d+[.,]?\d*))?/i);
+
+      if (priceBetweenMatch || priceAboveMatch) {
+        let pMin = 0;
+        let pMax = 999999;
+
+        if (priceBetweenMatch) {
+          pMin = parseFloat(priceBetweenMatch[1].replace(',', '.'));
+          pMax = parseFloat(priceBetweenMatch[2].replace(',', '.'));
+        } else if (priceAboveMatch) {
+          pMin = parseFloat(priceAboveMatch[1].replace(',', '.'));
+          if (priceAboveMatch[2]) {
+            pMax = parseFloat(priceAboveMatch[2].replace(',', '.'));
+          }
+        }
+
+        const res = await client.query(`
+          SELECT codigo_atual, codigo_fabrica, descricao, corredor, baia, nivel, locacao, quantidade, preco_sugerido
+          FROM produtos
+          WHERE UPPER(TRIM(corredor)) = UPPER($1)
+            AND preco_sugerido >= $2 AND preco_sugerido <= $3
+          ORDER BY preco_sugerido ASC
+          LIMIT 35
+        `, [targetCorredor, pMin, pMax]);
+
+        if (res.rows.length === 0) {
+          return `🔍 **Corredor ${targetCorredor}:** Nenhum item encontrado com preço entre ${formatMoney(pMin)} e ${formatMoney(pMax)}.`;
+        }
+
+        let reply = `💰 **Peças no Corredor ${targetCorredor} com Preço entre ${formatMoney(pMin)} e ${formatMoney(pMax)}:**\n\n`;
+        reply += `| Código | Descrição | Locação | Estoque | Preço Sugerido |\n`;
+        reply += `| :--- | :--- | :---: | :---: | :---: |\n`;
+        res.rows.forEach(p => {
+          const loc = p.locacao || [p.corredor, p.baia, p.nivel].filter(Boolean).join('-') || 'Sem locação';
+          const preco = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
+          reply += `| **${p.codigo_atual}** | ${p.descricao} | \`${loc}\` | ${p.quantidade} un | **${preco}** |\n`;
+        });
+        return reply;
+      }
+
+      // 3. Corredor + Termo de Peça (ex: "item no corredor N que sao parafusos", "itens parafuso corredor C")
+      let searchTermInCorredor = '';
+      const termPattern1 = cleanMsg.match(/(?:item|itens|produtos?|pe[cç]as?)\s+no\s+corredor\s+[A-Za-z0-9]+\s+que\s+s[aã]o\s+([A-Za-z0-9\s]+)/i);
+      const termPattern2 = cleanMsg.match(/(?:item|itens|produtos?|pe[cç]as?)\s+([A-Za-z0-9\s]+?)\s+(?:no\s+)?corredor/i);
+
+      if (termPattern1) {
+        searchTermInCorredor = termPattern1[1].trim();
+      } else if (termPattern2) {
+        searchTermInCorredor = termPattern2[1].trim();
+      }
+
+      if (searchTermInCorredor && !searchTermInCorredor.toLowerCase().includes('listagem')) {
+        const res = await client.query(`
+          SELECT codigo_atual, codigo_fabrica, descricao, corredor, baia, nivel, locacao, quantidade, preco_sugerido
+          FROM produtos
+          WHERE UPPER(TRIM(corredor)) = UPPER($1)
+            AND descricao ILIKE '%' || $2 || '%'
+          ORDER BY baia ASC, nivel ASC
+          LIMIT 35
+        `, [targetCorredor, searchTermInCorredor]);
+
+        if (res.rows.length === 0) {
+          return `🔍 **Corredor ${targetCorredor}:** Nenhuma peça com o termo **"${searchTermInCorredor}"** encontrada neste corredor.`;
+        }
+
+        let reply = `🔩 **Peças encontradas no Corredor ${targetCorredor} contendo "${searchTermInCorredor}":**\n\n`;
+        reply += `| Código | Descrição | Locação | Estoque | Preço Sugerido |\n`;
+        reply += `| :--- | :--- | :---: | :---: | :---: |\n`;
+        res.rows.forEach(p => {
+          const loc = p.locacao || [p.corredor, p.baia, p.nivel].filter(Boolean).join('-') || 'Sem locação';
+          const preco = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
+          reply += `| **${p.codigo_atual}** | ${p.descricao} | \`${loc}\` | ${p.quantidade} un | ${preco} |\n`;
+        });
+        return reply;
+      }
+
+      // 4. Listagem Geral do Corredor (ex: "quero a listagem do corredor M", "liste os item no corredor N")
+      const countTotal = await client.query(`
+        SELECT COUNT(*) as total, SUM(COALESCE(quantidade, 0)) as total_qtd 
+        FROM produtos WHERE UPPER(TRIM(corredor)) = UPPER($1)
+      `, [targetCorredor]);
+      const totalCorredor = parseInt(countTotal.rows[0]?.total, 10) || 0;
+      const totalEstoqueCorr = parseInt(countTotal.rows[0]?.total_qtd, 10) || 0;
+
+      if (totalCorredor === 0) {
+        return `🔍 **Corredor ${targetCorredor}:** Nenhum produto cadastrado neste corredor no banco de dados.`;
+      }
+
+      const res = await client.query(`
+        SELECT codigo_atual, codigo_fabrica, descricao, corredor, baia, nivel, locacao, quantidade, preco_sugerido
+        FROM produtos
+        WHERE UPPER(TRIM(corredor)) = UPPER($1)
+        ORDER BY baia ASC, nivel ASC, codigo_atual ASC
+        LIMIT 35
+      `, [targetCorredor]);
+
+      let reply = `📋 **Listagem do Corredor ${targetCorredor}** (${totalCorredor.toLocaleString('pt-BR')} itens | ${totalEstoqueCorr} un):\n\n`;
+      reply += `| Código | Descrição | Baia | Nível | Estoque | Preço Sugerido |\n`;
+      reply += `| :--- | :--- | :---: | :---: | :---: | :---: |\n`;
+
+      res.rows.forEach(p => {
+        const preco = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
+        reply += `| **${p.codigo_atual}** | ${p.descricao} | \`${p.baia || '—'}\` | ${p.nivel || '—'} | ${p.quantidade} un | ${preco} |\n`;
+      });
+
+      if (totalCorredor > 35) {
+        reply += `\n*Exibindo os primeiros 35 itens do corredor. Você pode filtrar por baia digitando: "corredor ${targetCorredor}, baia 1 ate 10"*`;
+      }
+      return reply;
+    } finally {
+      client.release();
+    }
+  }
+
+  // -------------------------------------------------------------
+  // 4. ALTERAÇÃO DE ITEM DA LISTA RÁPIDA ATIVA
   // Ex: "altere o comentario do item 1 para outra coisa"
   // Ex: "altere a locação do item 2 para B-01-2"
   // Ex: "remover item 1"
@@ -458,7 +944,7 @@ export async function processChatMessage(message: string, sessionId: string): Pr
   }
 
   // -------------------------------------------------------------
-  // 4. LISTAS RÁPIDAS (GERENCIAMENTO)
+  // 5. LISTAS RÁPIDAS (GERENCIAMENTO)
   // -------------------------------------------------------------
 
   // A) Iniciar Lista Rápida
@@ -471,7 +957,6 @@ export async function processChatMessage(message: string, sessionId: string): Pr
     lower === 'lista rápida';
 
   if (isStartListIntent) {
-    // Verificar se o nome da lista foi fornecido
     const nameMatch = cleanMsg.match(/(?:de\s+nome|chamada|com\s+o\s+nome|nome)\s+[:"']?([^"'\n]+)["']?/i);
     if (nameMatch && nameMatch[1].trim()) {
       const listName = nameMatch[1].trim();
@@ -484,7 +969,6 @@ export async function processChatMessage(message: string, sessionId: string): Pr
       activeQuickLists.set(sessionId, newList);
       return `📝 **Lista Rápida Iniciada!**\n\n` + renderQuickListTable(newList);
     } else {
-      // Pergunta o nome e aguarda próxima mensagem
       sessionFlowStates.set(sessionId, { state: 'waiting_list_name' });
       return `📝 **Nova Lista Rápida**\n\nQual será o nome da lista rápida? *(Ex: "Contagem de estoque setembro de 2026")*`;
     }
@@ -496,7 +980,6 @@ export async function processChatMessage(message: string, sessionId: string): Pr
       return '⚠️ Nenhuma lista rápida aberta para salvar no momento. Digite `inicie uma lista rapida` para começar.';
     }
 
-    const pool = getDbPool();
     if (!pool) return '❌ Banco de dados desconectado.';
 
     const client = await pool.connect();
@@ -534,7 +1017,6 @@ export async function processChatMessage(message: string, sessionId: string): Pr
 
   // C) Listar Listas Rápidas Salvas
   if (lower === 'listar listas rapidas' || lower === 'minhas listas' || lower === 'listas rapidas') {
-    const pool = getDbPool();
     if (!pool) return 'Banco de dados desconectado.';
     const client = await pool.connect();
     try {
@@ -557,7 +1039,6 @@ export async function processChatMessage(message: string, sessionId: string): Pr
   const openListMatch = lower.match(/(?:abrir|chamar|carregar)\s+lista\s+(?:rapida\s+)?#?(\d+)/i);
   if (openListMatch) {
     const targetId = parseInt(openListMatch[1], 10);
-    const pool = getDbPool();
     if (!pool) return 'Banco de dados desconectado.';
     const client = await pool.connect();
     try {
@@ -580,7 +1061,7 @@ export async function processChatMessage(message: string, sessionId: string): Pr
     }
   }
 
-  // E) Adicionar múltiplos itens à lista rápida ("cadastre os itens Y, X, Z" ou "adicione os itens Y, X, Z")
+  // E) Adicionar múltiplos itens à lista rápida
   const multiAddMatch = cleanMsg.match(/(?:cadastre|adicione|adicionar|coloque)\s+os\s+itens?\s+([A-Za-z0-9\s,;\.\-\/]+)/i);
   if (multiAddMatch && !cleanMsg.toLowerCase().includes('orçamento')) {
     let currentList = activeQuickLists.get(sessionId);
@@ -599,7 +1080,6 @@ export async function processChatMessage(message: string, sessionId: string): Pr
 
     for (const rawCode of rawCodes) {
       if (['os', 'itens', 'item', 'na', 'lista', 'para'].includes(rawCode.toLowerCase())) continue;
-      // Consultar no banco local para ver se existe locação
       const prods = await searchProductDb(rawCode);
       const exists = prods.length > 0;
       const loc = exists ? (prods[0].locacao || [prods[0].corredor, prods[0].baia, prods[0].nivel].filter(Boolean).join('-') || '') : '';
@@ -618,11 +1098,8 @@ export async function processChatMessage(message: string, sessionId: string): Pr
   }
 
   // F) Adicionar item individual à lista rápida aberta
-  // Ex: "70200821, I-032-3, caixa danificada" ou "70200821, caixa danificada" ou "item 70200821, tem apenas 2 no estoque"
   if (activeList && !lower.includes('criar orçamento') && !lower.includes('altere ') && !lower.startsWith('cadastre o item com codigo')) {
     const parts = cleanMsg.split(/[,;\n]+/).map(p => p.trim()).filter(Boolean);
-    
-    // Identificar código
     let code = '';
     let loc = '';
     let comment = '';
@@ -635,7 +1112,6 @@ export async function processChatMessage(message: string, sessionId: string): Pr
     } else if (parts.length >= 1) {
       code = parts[0].replace(/^(item|peça|peca)\s*/i, '').trim();
       if (parts.length === 2) {
-        // Se a segunda parte parece locação (ex: A-01-2 ou corredor...)
         if (/^[A-Z0-9]{1,3}-[A-Z0-9]{1,4}-[A-Z0-9]{1,3}$/i.test(parts[1]) || parts[1].toLowerCase().includes('corredor')) {
           loc = parts[1];
         } else {
@@ -647,9 +1123,7 @@ export async function processChatMessage(message: string, sessionId: string): Pr
       }
     }
 
-    // Se encontramos um código plausível (não é comando genérico)
     if (code && !['confirmar', 'cancelar', 'ajuda', 'salvar', 'ola', 'olá', 'sim'].includes(code.toLowerCase())) {
-      // Verificar se a peça existe no banco
       const prods = await searchProductDb(code);
       const exists = prods.length > 0;
       if (exists && !loc) {
@@ -669,7 +1143,7 @@ export async function processChatMessage(message: string, sessionId: string): Pr
   }
 
   // -------------------------------------------------------------
-  // 5. ALTERAÇÃO DE PRODUTO CADASTRADO NO BANCO
+  // 6. ALTERAÇÃO DE PRODUTO CADASTRADO NO BANCO
   // Ex: "altere a descrição do item 70200821 para Parafuso do cabeçote novo"
   // Ex: "altere o preço sugerido do item 70200821 para 1.50"
   // Ex: "altere a locação do item 70200821 para corredor B, baia 010, nivel 2"
@@ -682,7 +1156,6 @@ export async function processChatMessage(message: string, sessionId: string): Pr
     lower.startsWith('modifique ');
 
   if (isAlterProductIntent && !lower.includes('do item 1') && !lower.includes('do item 2')) {
-    // Extrair código do produto
     const codeMatch = cleanMsg.match(/(?:item|produto|código|codigo)\s+([A-Za-z0-9\.-]{3,20})/i);
     const targetCode = codeMatch ? codeMatch[1] : '';
 
@@ -692,7 +1165,7 @@ export async function processChatMessage(message: string, sessionId: string): Pr
 
     const prods = await searchProductDb(targetCode);
     if (prods.length === 0) {
-      return `❌ **Produto Não Encontrado:**\nNenhum produto cadastrado no banco com o código **"${targetCode}"** para alteração.`;
+      return `❌ **Produto Não Encontrado:** Nenhum produto cadastrado no banco com o código **"${targetCode}"** para alteração.`;
     }
 
     const prod = prods[0];
@@ -704,7 +1177,6 @@ export async function processChatMessage(message: string, sessionId: string): Pr
     let baia = '';
     let nivel = '';
 
-    // A) Alteração de Descrição
     if (lower.includes('descri') || lower.includes('nome')) {
       const descMatch = cleanMsg.match(/para\s+["']?([^"'\n]+)["']?$/i);
       if (!descMatch) return 'Por favor, informe a nova descrição após a palavra "para".';
@@ -712,9 +1184,7 @@ export async function processChatMessage(message: string, sessionId: string): Pr
       campoLabel = 'Descrição da Peça';
       valorAntigo = prod.descricao;
       valorNovo = descMatch[1].trim();
-    }
-    // B) Alteração de Preços
-    else if (lower.includes('preço sugerido') || lower.includes('preco sugerido') || lower.includes('sugerido')) {
+    } else if (lower.includes('preço sugerido') || lower.includes('preco sugerido') || lower.includes('sugerido')) {
       const valMatch = cleanMsg.match(/(?:para|por)\s*(?:R\$\s*)?(\d+[.,]?\d*)/i);
       if (!valMatch) return 'Informe o novo preço sugerido numérico.';
       campo = 'preco_sugerido';
@@ -735,14 +1205,11 @@ export async function processChatMessage(message: string, sessionId: string): Pr
       campoLabel = 'Preço Tabela';
       valorAntigo = prod.preco_tabela ? formatMoney(parseFloat(prod.preco_tabela)) : 'Não informado';
       valorNovo = formatMoney(parseFloat(valMatch[1].replace(',', '.')));
-    }
-    // C) Alteração de Locação
-    else if (lower.includes('locaç') || lower.includes('locac') || lower.includes('corredor') || lower.includes('baia') || lower.includes('nivel')) {
+    } else if (lower.includes('locaç') || lower.includes('locac') || lower.includes('corredor') || lower.includes('baia') || lower.includes('nivel')) {
       campo = 'locacao';
       campoLabel = 'Locação Física';
       valorAntigo = prod.locacao || [prod.corredor, prod.baia, prod.nivel].filter(Boolean).join('-') || 'Sem locação';
 
-      // Detectar corredor, baia, nivel se especificado
       const cMatch = cleanMsg.match(/corredor\s+([A-Za-z0-9]+)/i);
       const bMatch = cleanMsg.match(/baia\s+([A-Za-z0-9]+)/i);
       const nMatch = cleanMsg.match(/n[íi]vel\s+([A-Za-z0-9]+)/i);
@@ -761,7 +1228,6 @@ export async function processChatMessage(message: string, sessionId: string): Pr
       return `❌ Campo para alteração não reconhecido. Você pode alterar: **descrição**, **preço sugerido**, **preço mínimo**, **preço tabela** ou **locação**.`;
     }
 
-    // Armazenar na memória aguardando CONFIRMAR
     pendingProductUpdates.set(sessionId, {
       sessionId,
       produto_id: prod.id,
@@ -787,7 +1253,7 @@ export async function processChatMessage(message: string, sessionId: string): Pr
   }
 
   // -------------------------------------------------------------
-  // 6. CADASTRO DE NOVO PRODUTO NO BANCO
+  // 7. CADASTRO DE NOVO PRODUTO NO BANCO
   // Ex: "cadastre o item com codigo 998877, descricao: Bucha tensor, locacao: corredor A, baia 05, nivel 2, preco 120, 5 unidades"
   // -------------------------------------------------------------
   const isCreateProductIntent = 
@@ -804,7 +1270,6 @@ export async function processChatMessage(message: string, sessionId: string): Pr
 
     const newCode = codeMatch[1].trim();
 
-    // 1. Verificar se já existe no banco
     const existing = await searchProductDb(newCode);
     if (existing.length > 0) {
       const p = existing[0];
@@ -819,11 +1284,10 @@ export async function processChatMessage(message: string, sessionId: string): Pr
              `\`altere a [descrição/locação/preço] do item ${newCode} para...\``;
     }
 
-    // 2. Extrair campos opcionais
     let desc = '';
     const descMatch = cleanMsg.match(/descri[cç][aã]o\s*[:\s]*([^,;]+)/i);
     if (descMatch) desc = descMatch[1].trim();
-    if (!desc) desc = newCode; // Se vago, usa o próprio código como descrição provisória
+    if (!desc) desc = newCode;
 
     let corredor = '';
     let baia = '';
@@ -878,7 +1342,7 @@ export async function processChatMessage(message: string, sessionId: string): Pr
   }
 
   // -------------------------------------------------------------
-  // 7. CRIAÇÃO DE ORÇAMENTO
+  // 8. CRIAÇÃO DE ORÇAMENTO
   // -------------------------------------------------------------
   const isBudgetIntent = 
     lower.includes('orçamento') || 
@@ -1045,7 +1509,7 @@ export async function processChatMessage(message: string, sessionId: string): Pr
   }
 
   // -------------------------------------------------------------
-  // 8. CONSULTA DE LOCALIZAÇÃO OU ESTOQUE
+  // 9. CONSULTA SIMPLES DE LOCALIZAÇÃO OU ESTOQUE
   // -------------------------------------------------------------
   const isSearchIntent = 
     lower.includes('onde') || 
@@ -1081,53 +1545,36 @@ export async function processChatMessage(message: string, sessionId: string): Pr
            `* **Descrição:** ${p.descricao}\n` +
            `* **📍 Locação Física:** **Corredor ${p.corredor || '—'}, Baia ${p.baia || '—'}, Nível ${p.nivel || '—'}** (\`${locStr}\`)\n` +
            `* **📦 Estoque Físico:** **${p.quantidade}** unidades\n` +
-           `* **💵 Preço Sugerido:** ${precoSug} | **Preço Mínimo:** ${precoMin}\n\n` +
-           `Se desejar gerar uma prévia de orçamento para este item, basta solicitar:\n` +
+           `* **💵 Preço Sugerido:** ${precoSug} | **Preço Mínimo:** ${precoMin}\n` +
+           (p.codigos_alternativos ? `* **Códigos Alternativos/Genéricos:** ${p.codigos_alternativos}\n` : '') +
+           `\nSe desejar gerar uma prévia de orçamento para este item, basta solicitar:\n` +
            `\`criar orçamento, [Vendedor], ${p.codigo_atual}, [Qtd] unidades\``;
   }
 
   // -------------------------------------------------------------
-  // 9. LISTAR ÚLTIMOS ORÇAMENTOS
-  // -------------------------------------------------------------
-  if (lower.includes('ultimos orcamentos') || lower.includes('últimos orçamentos') || lower.includes('listar orçamentos')) {
-    const pool = getDbPool();
-    if (!pool) return 'Banco de dados desconectado.';
-    const client = await pool.connect();
-    try {
-      const res = await client.query('SELECT * FROM orcamentos ORDER BY criado_em DESC LIMIT 5');
-      if (res.rows.length === 0) {
-        return 'Nenhum orçamento gravado no banco de dados até o momento.';
-      }
-      let reply = `📋 **Últimos ${res.rows.length} Orçamentos Salvos:**\n\n`;
-      for (const r of res.rows) {
-        reply += `* **ID #${r.id}** (${new Date(r.criado_em).toLocaleDateString('pt-BR')}): Vendedor **${r.responsavel}** | Total: **${formatMoney(parseFloat(r.total_orcamento))}**\n`;
-      }
-      return reply;
-    } finally {
-      client.release();
-    }
-  }
-
-  // -------------------------------------------------------------
-  // 10. MENSAGEM NÃO COMPREENDIDA / AJUDA
+  // 10. MENSAGEM NÃO COMPREENDIDA / AJUDA COMPLETA
   // -------------------------------------------------------------
   return `❌ **Comando não compreendido com precisão:** "${cleanMsg}"\n\n` +
-         `Como posso te ajudar agora? Escolha uma das opções abaixo:\n\n` +
-         `1️⃣ **Anotações e Listas Rápidas:**\n` +
-         `   • Iniciar lista: \`inicie uma lista rapida de nome contagem de estoque\`\n` +
-         `   • Adicionar item: \`70200821, I-032-3, caixa danificada\`\n` +
-         `   • Múltiplos itens: \`cadastre os itens 70200821, 78467, 102030\`\n` +
-         `   • Salvar lista: \`salvar lista\`\n\n` +
-         `2️⃣ **Alterar Dados de Peça:**\n` +
-         `   • \`altere a descrição do item 70200821 para [Nova Descrição]\`\n` +
-         `   • \`altere o preço sugerido do item 70200821 para 50.00\`\n` +
-         `   • \`altere a locação do item 70200821 para corredor A, baia 01, nivel 3\`\n\n` +
-         `3️⃣ **Cadastrar Nova Peça:**\n` +
-         `   • \`cadastre o item com codigo 998877, descricao: Parafuso tensor, locacao: A-01-2, preco 45, 10 unidades\`\n\n` +
-         `4️⃣ **Criar Orçamento:**\n` +
-         `   • \`criar orçamento, Marlon, 70200821, 2 unidades\`\n\n` +
-         `5️⃣ **Localizar no Estoque:**\n` +
-         `   • \`onde está a peça 70200821?\``;
+         `Como posso te ajudar agora? Você pode fazer perguntas como:\n\n` +
+         `📍 **Consultas de Corredores e Localização:**\n` +
+         `   • \`quero a listagem do corredor B\`\n` +
+         `   • \`listagem do corredor B, baia 1 ate a 10\`\n` +
+         `   • \`listagem do corredor B item com preço acima de 100 reais\`\n` +
+         `   • \`item no corredor N que sao parafusos\`\n` +
+         `   • \`listagem de itens sem locação\`\n` +
+         `   • \`quatidade de item cadastrados em cada corredor\`\n\n` +
+         `📊 **Consultas Analíticas e de Estoque:**\n` +
+         `   • \`listagem dos 10 itens que mais aparecem nos orçamentos\`\n` +
+         `   • \`quantidade de itens com codigo generico\`\n` +
+         `   • \`listagem de itens sem preço\`\n` +
+         `   • \`onde está a peça 70200821?\`\n\n` +
+         `🔗 **Códigos Genéricos e Alterações:**\n` +
+         `   • \`vincular codigo generico 78467, no produto codigo 70200821\`\n` +
+         `   • \`altere a descrição do item 70200821 para Parafuso Cabeçote\`\n` +
+         `   • \`altere o preço sugerido do item 70200821 para 50.00\`\n\n` +
+         `📝 **Anotações e Orçamentos:**\n` +
+         `   • \`inicie uma lista rapida de nome contagem de estoque\`\n` +
+         `   • \`criar orçamento, Marlon, 70200821, 2 unidades\``;
 }
 
 chatRouter.post('/', async (req: Request, res: Response) => {
