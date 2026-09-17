@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { MessageSquare, Send, X, Bot, User, Trash2, Sparkles, ChevronDown } from 'lucide-react';
+import { MessageSquare, Send, X, Bot, User, Trash2, Sparkles, ChevronDown, Move } from 'lucide-react';
 
 interface ChatMessage {
   id: string;
@@ -28,12 +28,14 @@ const FormattedMessage: React.FC<{ text: string }> = ({ text }) => {
     const headers = parseCells(headerLine);
 
     elements.push(
-      <div key={`table-${key}`} className="my-2.5 overflow-x-auto rounded-xl border border-slate-700/80 bg-slate-950/60 shadow-sm max-w-full">
-        <table className="w-full text-left text-[11px] sm:text-xs min-w-[320px]">
-          <thead className="bg-slate-800/80 text-slate-300 font-semibold border-b border-slate-700/80">
+      <div key={`table-${key}`} className="my-2.5 overflow-x-auto rounded-xl border border-slate-700/80 bg-slate-950/70 shadow-md max-w-full">
+        <table className="w-full text-left text-xs">
+          <thead className="bg-slate-800/90 text-slate-300 font-bold border-b border-slate-700">
             <tr>
               {headers.map((h, hIdx) => (
-                <th key={hIdx} className="px-3 py-2 whitespace-nowrap">{h}</th>
+                <th key={hIdx} className="px-3 py-2 whitespace-nowrap text-[11px] text-slate-300 font-bold uppercase tracking-wider">
+                  {h}
+                </th>
               ))}
             </tr>
           </thead>
@@ -41,9 +43,9 @@ const FormattedMessage: React.FC<{ text: string }> = ({ text }) => {
             {dataLines.map((row, rIdx) => {
               const cells = parseCells(row);
               return (
-                <tr key={rIdx} className="hover:bg-slate-800/30 transition">
+                <tr key={rIdx} className="hover:bg-slate-800/40 transition">
                   {cells.map((c, cIdx) => (
-                    <td key={cIdx} className="px-3 py-2 whitespace-nowrap">
+                    <td key={cIdx} className={`px-3 py-2 text-xs ${cIdx === 2 ? 'min-w-[140px] max-w-[220px] whitespace-normal' : 'whitespace-nowrap'}`}>
                       {formatInlineText(c)}
                     </td>
                   ))}
@@ -66,7 +68,7 @@ const FormattedMessage: React.FC<{ text: string }> = ({ text }) => {
       }
       if (p.startsWith('`') && p.endsWith('`')) {
         return (
-          <code key={idx} className="px-1 py-0.5 rounded bg-slate-800 text-indigo-300 font-mono text-[11px] border border-slate-700/60">
+          <code key={idx} className="px-1.5 py-0.5 rounded bg-slate-800 text-indigo-300 font-mono text-[11px] border border-slate-700/60">
             {p.slice(1, -1)}
           </code>
         );
@@ -124,6 +126,24 @@ export const ChatAssistant: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Posição arrastável do botão flutuante no celular para NUNCA tampar botões ou conteúdo
+  const [fabPosition, setFabPosition] = useState<{ x: number; y: number } | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const saved = localStorage.getItem('kipstock_chat_fab_pos');
+      if (saved) return JSON.parse(saved);
+    } catch (e) {}
+    return null;
+  });
+
+  const dragRef = useRef<{ startX: number; startY: number; initialX: number; initialY: number; isDragging: boolean }>({
+    startX: 0,
+    startY: 0,
+    initialX: 0,
+    initialY: 0,
+    isDragging: false,
+  });
+
   // ID persistente de sessão durante a navegação
   const [sessionId] = useState(() => 'sess_' + Math.random().toString(36).substring(7));
 
@@ -136,6 +156,52 @@ export const ChatAssistant: React.FC = () => {
       scrollToBottom();
     }
   }, [messages, isOpen]);
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLButtonElement>) => {
+    const touch = e.touches[0];
+    const rect = e.currentTarget.getBoundingClientRect();
+    dragRef.current = {
+      startX: touch.clientX,
+      startY: touch.clientY,
+      initialX: rect.left,
+      initialY: rect.top,
+      isDragging: false,
+    };
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLButtonElement>) => {
+    const touch = e.touches[0];
+    const dx = touch.clientX - dragRef.current.startX;
+    const dy = touch.clientY - dragRef.current.startY;
+
+    // Considera drag se moveu mais de 6px
+    if (Math.hypot(dx, dy) > 6) {
+      dragRef.current.isDragging = true;
+      const winW = window.innerWidth;
+      const winH = window.innerHeight;
+      
+      // Limites seguros na tela
+      const newX = Math.max(12, Math.min(winW - 68, dragRef.current.initialX + dx));
+      const newY = Math.max(64, Math.min(winH - 84, dragRef.current.initialY + dy));
+
+      setFabPosition({ x: newX, y: newY });
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (dragRef.current.isDragging) {
+      if (fabPosition) {
+        try {
+          localStorage.setItem('kipstock_chat_fab_pos', JSON.stringify(fabPosition));
+        } catch (e) {}
+      }
+      setTimeout(() => {
+        dragRef.current.isDragging = false;
+      }, 100);
+    } else {
+      setIsOpen(true);
+    }
+  };
 
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -188,12 +254,26 @@ export const ChatAssistant: React.FC = () => {
 
   return (
     <>
-      {/* Botão Flutuante - Posicionado perfeitamente no Mobile (bottom-20) para não colidir com o menu inferior */}
+      {/* Botão Flutuante (FAB) - Arrastável no Mobile para não tampar nenhuma informação ou botão */}
       {!isOpen && (
         <button
-          onClick={() => setIsOpen(true)}
-          className="fixed bottom-20 right-4 sm:bottom-6 sm:right-6 h-14 w-14 bg-gradient-to-tr from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-600 text-white rounded-full shadow-2xl shadow-indigo-600/50 flex items-center justify-center transition-all z-50 transform hover:scale-105 active:scale-95 border-2 border-white/20"
-          title="Abrir Assistente OttoDiesel"
+          onClick={() => {
+            if (!dragRef.current.isDragging) {
+              setIsOpen(true);
+            }
+          }}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          style={
+            fabPosition
+              ? { left: `${fabPosition.x}px`, top: `${fabPosition.y}px`, right: 'auto', bottom: 'auto' }
+              : undefined
+          }
+          className={`${
+            fabPosition ? 'fixed' : 'fixed bottom-24 right-4 sm:bottom-6 sm:right-6'
+          } h-14 w-14 bg-gradient-to-tr from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-600 text-white rounded-full shadow-2xl shadow-indigo-600/50 flex items-center justify-center transition-transform z-50 transform hover:scale-105 active:scale-95 border-2 border-white/20 touch-none select-none`}
+          title="Abrir Assistente OttoDiesel (Arraste para reposicionar)"
           aria-label="Assistente OttoDiesel"
         >
           <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
@@ -268,15 +348,17 @@ export const ChatAssistant: React.FC = () => {
                     : 'bg-slate-900 border border-slate-800 text-slate-200 rounded-tl-none'
                 }`}>
                   {msg.sender === 'user' ? (
-                    <p className="text-xs sm:text-sm whitespace-pre-wrap">{msg.text}</p>
+                    <p className="text-xs sm:text-sm whitespace-pre-wrap leading-relaxed">{msg.text}</p>
                   ) : (
                     <FormattedMessage text={msg.text} />
                   )}
-                  <span className={`text-[9px] mt-1.5 block text-right font-mono ${
-                    msg.sender === 'user' ? 'text-indigo-200' : 'text-slate-500'
-                  }`}>
-                    {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
+                  <div className="flex items-center justify-end gap-1 mt-1 pt-0.5">
+                    <span className={`text-[10px] font-mono ${
+                      msg.sender === 'user' ? 'text-indigo-200' : 'text-slate-500'
+                    }`}>
+                      {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
                 </div>
               </div>
             ))}

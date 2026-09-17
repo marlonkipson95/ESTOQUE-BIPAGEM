@@ -629,7 +629,7 @@ export async function processChatMessage(message: string, sessionId: string): Pr
       const totalSemLoc = parseInt(countRes.rows[0]?.total, 10) || 0;
 
       const res = await client.query(`
-        SELECT codigo_atual, codigo_fabrica, descricao, quantidade, preco_sugerido
+        SELECT id, codigo_atual, codigo_fabrica, codigo_barras_atual, descricao, quantidade, preco_sugerido
         FROM produtos
         WHERE (locacao IS NULL OR TRIM(locacao) = '' OR TRIM(locacao) ILIKE 'sem loc%' OR TRIM(locacao) ILIKE 'sem local%')
           AND (corredor IS NULL OR TRIM(corredor) = '')
@@ -643,12 +643,16 @@ export async function processChatMessage(message: string, sessionId: string): Pr
 
       let reply = `📍 **Itens Sem Locação Física Atribuída** (${totalSemLoc.toLocaleString('pt-BR')} itens no total):\n\n`;
       reply += `*Exibindo os primeiros 25 itens ordenados por estoque:*\n\n`;
-      reply += `| Código | Descrição | Estoque | Preço Sugerido |\n`;
-      reply += `| :--- | :--- | :---: | :---: |\n`;
+      reply += `| Cód. Produto | ID Sistema | Descrição | Estoque | Preço Sugerido |\n`;
+      reply += `| :--- | :---: | :--- | :---: | :---: |\n`;
 
       res.rows.forEach(p => {
+        const codProd = (p.codigo_fabrica && p.codigo_fabrica.trim() !== '' && !p.codigo_fabrica.startsWith('PRD-'))
+          ? p.codigo_fabrica
+          : (p.codigo_atual && !p.codigo_atual.startsWith('PRD-') ? p.codigo_atual : (p.codigo_barras_atual || p.id));
+        const idSis = p.id || '—';
         const preco = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
-        reply += `| **${p.codigo_atual}** | ${p.descricao} | ${p.quantidade} un | ${preco} |\n`;
+        reply += `| **${codProd}** | \`${idSis}\` | ${p.descricao} | ${p.quantidade} un | ${preco} |\n`;
       });
 
       reply += `\n💡 Para definir a locação de qualquer uma dessas peças, digite:\n\`altere a locação do item [CÓDIGO] para corredor X, baia Y, nivel Z\``;
@@ -675,7 +679,7 @@ export async function processChatMessage(message: string, sessionId: string): Pr
       const totalSemPreco = parseInt(countRes.rows[0]?.total, 10) || 0;
 
       const res = await client.query(`
-        SELECT codigo_atual, descricao, corredor, baia, nivel, locacao, quantidade
+        SELECT id, codigo_atual, codigo_fabrica, codigo_barras_atual, descricao, corredor, baia, nivel, locacao, quantidade
         FROM produtos
         WHERE preco_sugerido IS NULL OR preco_sugerido = 0
         ORDER BY quantidade DESC, codigo_atual ASC
@@ -688,12 +692,16 @@ export async function processChatMessage(message: string, sessionId: string): Pr
 
       let reply = `💵 **Itens Sem Preço Sugerido Cadastrado** (${totalSemPreco.toLocaleString('pt-BR')} itens no total):\n\n`;
       reply += `*Exibindo os primeiros 25 itens:*\n\n`;
-      reply += `| Código | Descrição | Locação | Estoque |\n`;
-      reply += `| :--- | :--- | :---: | :---: |\n`;
+      reply += `| Cód. Produto | ID Sistema | Descrição | Locação | Estoque |\n`;
+      reply += `| :--- | :---: | :--- | :---: | :---: |\n`;
 
       res.rows.forEach(p => {
+        const codProd = (p.codigo_fabrica && p.codigo_fabrica.trim() !== '' && !p.codigo_fabrica.startsWith('PRD-'))
+          ? p.codigo_fabrica
+          : (p.codigo_atual && !p.codigo_atual.startsWith('PRD-') ? p.codigo_atual : (p.codigo_barras_atual || p.id));
+        const idSis = p.id || '—';
         const loc = p.locacao || [p.corredor, p.baia, p.nivel].filter(Boolean).join('-') || 'Sem locação';
-        reply += `| **${p.codigo_atual}** | ${p.descricao} | \`${loc}\` | ${p.quantidade} un |\n`;
+        reply += `| **${codProd}** | \`${idSis}\` | ${p.descricao} | \`${loc}\` | ${p.quantidade} un |\n`;
       });
 
       reply += `\n💡 Para cadastrar o preço de qualquer item, digite:\n\`altere o preço sugerido do item [CÓDIGO] para [VALOR]\``;
@@ -761,7 +769,7 @@ export async function processChatMessage(message: string, sessionId: string): Pr
         const bFim = parseInt(baiaRangeMatch[2], 10);
 
         const res = await client.query(`
-          SELECT codigo_atual, codigo_fabrica, descricao, corredor, baia, nivel, locacao, quantidade, preco_sugerido
+          SELECT id, codigo_atual, codigo_fabrica, codigo_barras_atual, descricao, corredor, baia, nivel, locacao, quantidade, preco_sugerido
           FROM produtos
           WHERE UPPER(TRIM(corredor)) = UPPER($1)
             AND NULLIF(regexp_replace(baia, '\\D', '', 'g'), '')::integer BETWEEN $2 AND $3
@@ -774,11 +782,15 @@ export async function processChatMessage(message: string, sessionId: string): Pr
         }
 
         let reply = `📦 **Peças no Corredor ${targetCorredor} (Baias ${bIni} a ${bFim}):**\n\n`;
-        reply += `| Código | Descrição | Baia | Nível | Estoque | Preço Sugerido |\n`;
-        reply += `| :--- | :--- | :---: | :---: | :---: | :---: |\n`;
+        reply += `| Cód. Produto | ID Sistema | Descrição | Baia | Nível | Estoque | Preço Sugerido |\n`;
+        reply += `| :--- | :---: | :--- | :---: | :---: | :---: | :---: |\n`;
         res.rows.forEach(p => {
+          const codProd = (p.codigo_fabrica && p.codigo_fabrica.trim() !== '' && !p.codigo_fabrica.startsWith('PRD-'))
+            ? p.codigo_fabrica
+            : (p.codigo_atual && !p.codigo_atual.startsWith('PRD-') ? p.codigo_atual : (p.codigo_barras_atual || p.id));
+          const idSis = p.id || '—';
           const preco = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
-          reply += `| **${p.codigo_atual}** | ${p.descricao} | \`${p.baia || '—'}\` | ${p.nivel || '—'} | ${p.quantidade} un | ${preco} |\n`;
+          reply += `| **${codProd}** | \`${idSis}\` | ${p.descricao} | \`${p.baia || '—'}\` | ${p.nivel || '—'} | ${p.quantidade} un | ${preco} |\n`;
         });
         return reply;
       }
@@ -802,7 +814,7 @@ export async function processChatMessage(message: string, sessionId: string): Pr
         }
 
         const res = await client.query(`
-          SELECT codigo_atual, codigo_fabrica, descricao, corredor, baia, nivel, locacao, quantidade, preco_sugerido
+          SELECT id, codigo_atual, codigo_fabrica, codigo_barras_atual, descricao, corredor, baia, nivel, locacao, quantidade, preco_sugerido
           FROM produtos
           WHERE UPPER(TRIM(corredor)) = UPPER($1)
             AND preco_sugerido >= $2 AND preco_sugerido <= $3
@@ -815,12 +827,16 @@ export async function processChatMessage(message: string, sessionId: string): Pr
         }
 
         let reply = `💰 **Peças no Corredor ${targetCorredor} com Preço entre ${formatMoney(pMin)} e ${formatMoney(pMax)}:**\n\n`;
-        reply += `| Código | Descrição | Locação | Estoque | Preço Sugerido |\n`;
-        reply += `| :--- | :--- | :---: | :---: | :---: |\n`;
+        reply += `| Cód. Produto | ID Sistema | Descrição | Locação | Estoque | Preço Sugerido |\n`;
+        reply += `| :--- | :---: | :--- | :---: | :---: | :---: |\n`;
         res.rows.forEach(p => {
+          const codProd = (p.codigo_fabrica && p.codigo_fabrica.trim() !== '' && !p.codigo_fabrica.startsWith('PRD-'))
+            ? p.codigo_fabrica
+            : (p.codigo_atual && !p.codigo_atual.startsWith('PRD-') ? p.codigo_atual : (p.codigo_barras_atual || p.id));
+          const idSis = p.id || '—';
           const loc = p.locacao || [p.corredor, p.baia, p.nivel].filter(Boolean).join('-') || 'Sem locação';
           const preco = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
-          reply += `| **${p.codigo_atual}** | ${p.descricao} | \`${loc}\` | ${p.quantidade} un | **${preco}** |\n`;
+          reply += `| **${codProd}** | \`${idSis}\` | ${p.descricao} | \`${loc}\` | ${p.quantidade} un | **${preco}** |\n`;
         });
         return reply;
       }
@@ -838,7 +854,7 @@ export async function processChatMessage(message: string, sessionId: string): Pr
 
       if (searchTermInCorredor && !searchTermInCorredor.toLowerCase().includes('listagem')) {
         const res = await client.query(`
-          SELECT codigo_atual, codigo_fabrica, descricao, corredor, baia, nivel, locacao, quantidade, preco_sugerido
+          SELECT id, codigo_atual, codigo_fabrica, codigo_barras_atual, descricao, corredor, baia, nivel, locacao, quantidade, preco_sugerido
           FROM produtos
           WHERE UPPER(TRIM(corredor)) = UPPER($1)
             AND descricao ILIKE '%' || $2 || '%'
@@ -851,12 +867,16 @@ export async function processChatMessage(message: string, sessionId: string): Pr
         }
 
         let reply = `🔩 **Peças encontradas no Corredor ${targetCorredor} contendo "${searchTermInCorredor}":**\n\n`;
-        reply += `| Código | Descrição | Locação | Estoque | Preço Sugerido |\n`;
-        reply += `| :--- | :--- | :---: | :---: | :---: |\n`;
+        reply += `| Cód. Produto | ID Sistema | Descrição | Locação | Estoque | Preço Sugerido |\n`;
+        reply += `| :--- | :---: | :--- | :---: | :---: | :---: |\n`;
         res.rows.forEach(p => {
+          const codProd = (p.codigo_fabrica && p.codigo_fabrica.trim() !== '' && !p.codigo_fabrica.startsWith('PRD-'))
+            ? p.codigo_fabrica
+            : (p.codigo_atual && !p.codigo_atual.startsWith('PRD-') ? p.codigo_atual : (p.codigo_barras_atual || p.id));
+          const idSis = p.id || '—';
           const loc = p.locacao || [p.corredor, p.baia, p.nivel].filter(Boolean).join('-') || 'Sem locação';
           const preco = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
-          reply += `| **${p.codigo_atual}** | ${p.descricao} | \`${loc}\` | ${p.quantidade} un | ${preco} |\n`;
+          reply += `| **${codProd}** | \`${idSis}\` | ${p.descricao} | \`${loc}\` | ${p.quantidade} un | ${preco} |\n`;
         });
         return reply;
       }
@@ -874,7 +894,7 @@ export async function processChatMessage(message: string, sessionId: string): Pr
       }
 
       const res = await client.query(`
-        SELECT codigo_atual, codigo_fabrica, descricao, corredor, baia, nivel, locacao, quantidade, preco_sugerido
+        SELECT id, codigo_atual, codigo_fabrica, codigo_barras_atual, descricao, corredor, baia, nivel, locacao, quantidade, preco_sugerido
         FROM produtos
         WHERE UPPER(TRIM(corredor)) = UPPER($1)
         ORDER BY baia ASC, nivel ASC, codigo_atual ASC
@@ -882,12 +902,16 @@ export async function processChatMessage(message: string, sessionId: string): Pr
       `, [targetCorredor]);
 
       let reply = `📋 **Listagem do Corredor ${targetCorredor}** (${totalCorredor.toLocaleString('pt-BR')} itens | ${totalEstoqueCorr} un):\n\n`;
-      reply += `| Código | Descrição | Baia | Nível | Estoque | Preço Sugerido |\n`;
-      reply += `| :--- | :--- | :---: | :---: | :---: | :---: |\n`;
+      reply += `| Cód. Produto | ID Sistema | Descrição | Baia | Nível | Estoque | Preço Sugerido |\n`;
+      reply += `| :--- | :---: | :--- | :---: | :---: | :---: | :---: |\n`;
 
       res.rows.forEach(p => {
+        const codProd = (p.codigo_fabrica && p.codigo_fabrica.trim() !== '' && !p.codigo_fabrica.startsWith('PRD-'))
+          ? p.codigo_fabrica
+          : (p.codigo_atual && !p.codigo_atual.startsWith('PRD-') ? p.codigo_atual : (p.codigo_barras_atual || p.id));
+        const idSis = p.id || '—';
         const preco = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : '—';
-        reply += `| **${p.codigo_atual}** | ${p.descricao} | \`${p.baia || '—'}\` | ${p.nivel || '—'} | ${p.quantidade} un | ${preco} |\n`;
+        reply += `| **${codProd}** | \`${idSis}\` | ${p.descricao} | \`${p.baia || '—'}\` | ${p.nivel || '—'} | ${p.quantidade} un | ${preco} |\n`;
       });
 
       if (totalCorredor > 35) {

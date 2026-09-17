@@ -348,7 +348,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
   // RENDERIZAÇÃO: MODO EDIÇÃO / ANOTAÇÃO
   // ==========================================
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-32">
       {/* Top Action Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-800 pb-4">
         <div className="flex items-center gap-3">
@@ -550,65 +550,118 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
             Nenhum item adicionado a esta lista ainda. Bipe uma peça ou digite o código acima para começar.
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-800/60 text-slate-400 font-semibold border-b border-slate-800">
-                <tr>
-                  <th className="px-4 py-3 w-12 text-center">#</th>
-                  <th className="px-4 py-3">Código</th>
-                  <th className="px-4 py-3">Locação</th>
-                  <th className="px-4 py-3">Comentário / Observação</th>
-                  <th className="px-4 py-3 text-center">Status</th>
-                  <th className="px-4 py-3 w-16 text-right">Ação</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-800/60">
-                {currentLista.itens.map((item, idx) => (
-                  <tr key={item.id} className="hover:bg-slate-800/30 transition">
-                    <td className="px-4 py-3 text-center text-slate-400 font-mono">
-                      {currentLista.itens.length - idx}
-                    </td>
-                    <td className="px-4 py-3 font-mono font-bold text-white">
-                      {item.codigo}
-                    </td>
-                    <td className="px-4 py-3">
-                      {item.locacao ? (
-                        <span className="inline-flex items-center gap-1 font-mono font-semibold text-slate-200 bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
-                          <MapPin className="h-3 w-3 text-indigo-400" />
-                          {item.locacao}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400 italic">Sem locação</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-slate-300">
-                      {item.comentario || <span className="text-slate-400 italic">—</span>}
-                    </td>
-                    <td className="px-4 py-3 text-center">
+          <>
+            {/* 1. VISUALIZAÇÃO EM CARDS PARA CELULAR (sm:hidden) - Perfeita legibilidade, sem quebra de texto */}
+            <div className="sm:hidden divide-y divide-slate-800/80">
+              {currentLista.itens.map((item, idx) => (
+                <div key={item.id} className="p-4 space-y-2.5 hover:bg-slate-800/30 transition">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700">
+                        #{currentLista.itens.length - idx}
+                      </span>
+                      <span className="font-mono text-sm font-bold text-white tracking-wide">
+                        {item.codigo}
+                      </span>
                       {item.cadastrado ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded whitespace-nowrap">
                           <Check className="h-3 w-3" /> No Sistema
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
-                          Avulso / Novo
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-400 bg-slate-800 px-2 py-0.5 rounded whitespace-nowrap">
+                          Avulso
                         </span>
                       )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <button
-                        onClick={() => handleRemoverItem(item.id)}
-                        className="p-1 rounded text-slate-500 hover:text-rose-400 transition"
-                        title="Remover item da lista"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </td>
+                    </div>
+                    <button
+                      onClick={() => handleRemoverItem(item.id)}
+                      className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition shrink-0"
+                      title="Remover item da lista"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  {item.locacao && (
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-slate-400 font-semibold">Locação:</span>
+                      <span className="inline-flex items-center gap-1 font-mono font-bold text-xs text-indigo-300 bg-indigo-950/40 px-2 py-0.5 rounded border border-indigo-800/40 whitespace-nowrap">
+                        <MapPin className="h-3 w-3 text-indigo-400" />
+                        {item.locacao}
+                      </span>
+                    </div>
+                  )}
+
+                  {item.comentario && (
+                    <div className="bg-slate-800/50 rounded-lg px-2.5 py-1.5 border border-slate-700/50 text-xs text-slate-300 break-words">
+                      {item.comentario}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* 2. TABELA COMPLETA PARA TABLET E DESKTOP (hidden sm:block) - Com rolagem horizontal segura e sem quebra */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-left text-xs min-w-[620px]">
+                <thead className="bg-slate-800/60 text-slate-400 font-semibold border-b border-slate-800">
+                  <tr>
+                    <th className="px-4 py-3 w-12 text-center whitespace-nowrap">#</th>
+                    <th className="px-4 py-3 whitespace-nowrap">Código</th>
+                    <th className="px-4 py-3 whitespace-nowrap">Locação</th>
+                    <th className="px-4 py-3 min-w-[200px]">Comentário / Observação</th>
+                    <th className="px-4 py-3 text-center whitespace-nowrap">Status</th>
+                    <th className="px-4 py-3 w-16 text-right whitespace-nowrap">Ação</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {currentLista.itens.map((item, idx) => (
+                    <tr key={item.id} className="hover:bg-slate-800/30 transition">
+                      <td className="px-4 py-3 text-center text-slate-400 font-mono whitespace-nowrap">
+                        {currentLista.itens.length - idx}
+                      </td>
+                      <td className="px-4 py-3 font-mono font-bold text-white whitespace-nowrap">
+                        {item.codigo}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {item.locacao ? (
+                          <span className="inline-flex items-center gap-1 font-mono font-bold text-xs text-slate-200 bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700 whitespace-nowrap">
+                            <MapPin className="h-3 w-3 text-indigo-400" />
+                            {item.locacao}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 italic">Sem locação</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-slate-300">
+                        {item.comentario || <span className="text-slate-400 italic">—</span>}
+                      </td>
+                      <td className="px-4 py-3 text-center whitespace-nowrap">
+                        {item.cadastrado ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded whitespace-nowrap">
+                            <Check className="h-3 w-3" /> No Sistema
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-400 bg-slate-800 px-2 py-0.5 rounded whitespace-nowrap">
+                            Avulso / Novo
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-right whitespace-nowrap">
+                        <button
+                          onClick={() => handleRemoverItem(item.id)}
+                          className="p-1 rounded text-slate-500 hover:text-rose-400 transition"
+                          title="Remover item da lista"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
     </div>
