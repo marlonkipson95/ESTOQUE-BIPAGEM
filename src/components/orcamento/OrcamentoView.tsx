@@ -64,12 +64,23 @@ export const OrcamentoView: React.FC<OrcamentoViewProps> = ({
   // Listen to external barcode scanner
   useEffect(() => {
     if (externalScannedCode && viewState === 'edit') {
-      const match = products.find(p => 
-        p.codigo_barras_atual === externalScannedCode || 
-        p.codigo_atual === externalScannedCode || 
-        p.codigo_fabrica === externalScannedCode ||
-        p.codigos_alternativos?.includes(externalScannedCode)
-      );
+      const cleanCode = externalScannedCode.trim().toUpperCase();
+      const codeWithoutE = cleanCode.endsWith('E') ? cleanCode.slice(0, -1) : cleanCode;
+      const codeWithE = codeWithoutE + 'E';
+
+      const match = products.find(p => {
+        const cb = p.codigo_barras_atual?.toUpperCase();
+        const ca = p.codigo_atual?.toUpperCase();
+        const cf = p.codigo_fabrica?.toUpperCase();
+        const alt = p.codigos_alternativos?.toUpperCase();
+        
+        return (
+          cb === codeWithoutE || cb === codeWithE ||
+          ca === codeWithoutE || ca === codeWithE ||
+          cf === codeWithoutE || cf === codeWithE ||
+          alt?.includes(codeWithoutE) || alt?.includes(codeWithE)
+        );
+      });
       if (match) {
         addItem(match);
       }
@@ -79,13 +90,22 @@ export const OrcamentoView: React.FC<OrcamentoViewProps> = ({
 
   const searchResults = useMemo(() => {
     if (!searchTerm.trim()) return [];
-    const term = searchTerm.toLowerCase();
-    return products.filter(p => 
-      p.descricao.toLowerCase().includes(term) ||
-      p.codigo_atual.toLowerCase().includes(term) ||
-      p.codigo_fabrica.toLowerCase().includes(term) ||
-      p.codigo_barras_atual?.toLowerCase().includes(term)
-    ).slice(0, 10);
+    const term = searchTerm.toUpperCase().trim();
+    const termWithoutE = term.endsWith('E') ? term.slice(0, -1) : term;
+    
+    return products.filter(p => {
+      const desc = p.descricao.toUpperCase();
+      const ca = p.codigo_atual.toUpperCase();
+      const cf = p.codigo_fabrica.toUpperCase();
+      const cb = p.codigo_barras_atual?.toUpperCase() || '';
+      
+      return (
+        desc.includes(term) ||
+        ca.includes(term) || ca.includes(termWithoutE) ||
+        cf.includes(term) || cf.includes(termWithoutE) ||
+        cb.includes(term) || cb.includes(termWithoutE)
+      );
+    }).slice(0, 10);
   }, [searchTerm, products]);
 
   const addItem = (p: Product) => {
@@ -435,9 +455,9 @@ export const OrcamentoView: React.FC<OrcamentoViewProps> = ({
                       <div className="font-bold text-sm text-slate-900 dark:text-white">{item.descricao}</div>
                     </td>
                     <td className="p-3 print:hidden">
-                      <div className="text-[10px] font-mono text-slate-500">Mín: {formatCurrency(item.preco_minimo || 0)}</div>
-                      <div className="text-[10px] font-mono text-slate-500">Sug: {formatCurrency(item.preco_sugerido || 0)}</div>
-                      <div className="text-[10px] font-mono text-slate-500">Tab: {formatCurrency(item.preco_tabela || 0)}</div>
+                      <div className="text-xs font-mono text-slate-500 dark:text-slate-400 font-medium">Mín: {formatCurrency(item.preco_minimo || 0)}</div>
+                      <div className="text-xs font-mono text-slate-500 dark:text-slate-400 font-medium">Sug: {formatCurrency(item.preco_sugerido || 0)}</div>
+                      <div className="text-xs font-mono text-slate-500 dark:text-slate-400 font-medium">Tab: {formatCurrency(item.preco_tabela || 0)}</div>
                     </td>
                     <td className="p-3 text-center">
                       <input 
@@ -495,10 +515,10 @@ export const OrcamentoView: React.FC<OrcamentoViewProps> = ({
                     <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
-                
-                <div className="grid grid-cols-2 gap-2 text-xs font-mono text-slate-500 bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg">
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] sm:text-xs font-mono text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/50 p-2 rounded-lg font-medium">
                   <div>Mín: {formatCurrency(item.preco_minimo || 0)}</div>
                   <div>Sug: {formatCurrency(item.preco_sugerido || 0)}</div>
+                  <div>Tab: {formatCurrency(item.preco_tabela || 0)}</div>
                 </div>
 
                 <div className="flex items-center gap-2">

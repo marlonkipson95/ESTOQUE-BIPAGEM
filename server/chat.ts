@@ -1004,11 +1004,6 @@ export async function processChatMessage(message: string, sessionId: string): Pr
         reply += `| **${codProd}** | ${p.descricao} | \`${loc}\` | ${pMinVal} | ${pSugVal} | ${pTabVal} |\n`;
       });
       return reply;
-    } finally {
-      client.release();
-    }
-  }
-
   // -------------------------------------------------------------
   // 4. ALTERAÇÃO DE ITEM DA LISTA RÁPIDA ATIVA
   // Ex: "altere o comentario do item 1 para outra coisa"
@@ -1665,7 +1660,7 @@ export async function processChatMessage(message: string, sessionId: string): Pr
   // -------------------------------------------------------------
   // 10. MENSAGEM NÃO COMPREENDIDA / AJUDA COMPLETA
   // -------------------------------------------------------------
-  return `❌ **Comando não compreendido com precisão:** "${cleanMsg}"\n\n` +
+  let fallbackMessage = `❌ **Comando não compreendido com precisão:** "${cleanMsg}"\n\n` +
          `Como posso te ajudar agora? Você pode fazer perguntas como:\n\n` +
          `📍 **Consultas de Corredores e Localização:**\n` +
          `   • \`quero a listagem do corredor B\`\n` +
@@ -1686,6 +1681,15 @@ export async function processChatMessage(message: string, sessionId: string): Pr
          `📝 **Anotações e Orçamentos:**\n` +
          `   • \`inicie uma lista rapida de nome contagem de estoque\`\n` +
          `   • \`criar orçamento, Marlon, 70200821, 2 unidades\``;
+
+  const currentList = activeQuickLists.get(sessionId);
+  if (currentList && currentList.itens.length > 0) {
+    fallbackMessage += `\n\n📋 **Sua Lista Rápida Atual ("${currentList.nome}"):**\n` +
+                       `Se você queria alterar algo na lista, use: \`altere o comentario do item 1 para "outra coisa"\`\n\n` + 
+                       renderQuickListTable(currentList);
+  }
+
+  return fallbackMessage;
 }
 
 chatRouter.post('/', async (req: Request, res: Response) => {

@@ -148,6 +148,8 @@ function loadMemoryProductExtras(product: any) {
 // ==========================================
 // 1. GET /api/health
 // ==========================================
+// 1. GET /api/health
+// ==========================================
 apiRouter.get('/health', async (req: Request, res: Response) => {
   const check = await checkDatabaseConnection();
   res.json({
@@ -156,6 +158,117 @@ apiRouter.get('/health', async (req: Request, res: Response) => {
     provider: check.connected ? 'neon-postgresql' : 'memory-fallback',
     error: check.error || null,
   });
+});
+
+// ==========================================
+// 1.5. Listas Rápidas (Anotações Rápidas)
+// ==========================================
+apiRouter.get('/listas-rapidas', async (req: Request, res: Response) => {
+  const pool = getDbPool();
+  if (pool) {
+    try {
+      const client = await pool.connect();
+      try {
+        const { rows } = await client.query('SELECT * FROM listas_rapidas ORDER BY criado_em DESC');
+        return res.json(rows);
+      } finally {
+        client.release();
+      }
+    } catch (e: any) {
+      console.error('Erro ao buscar listas_rapidas:', e.message);
+      return res.status(500).json({ error: 'Falha no banco de dados' });
+    }
+  }
+  return res.json([]);
+});
+
+apiRouter.post('/listas-rapidas', async (req: Request, res: Response) => {
+  const pool = getDbPool();
+  if (pool) {
+    try {
+      const { id, nome, responsavel, itens } = req.body;
+      const client = await pool.connect();
+      try {
+        const total = Array.isArray(itens) ? itens.length : 0;
+        const itensJson = JSON.stringify(itens || []);
+        
+        if (id) {
+          const { rows } = await client.query(
+            `UPDATE listas_rapidas SET nome=$1, responsavel=$2, itens=$3, total_itens=$4, atualizado_em=NOW() WHERE id=$5 RETURNING *`,
+            [nome, responsavel || 'Estoque', itensJson, total, id]
+          );
+          return res.json(rows[0]);
+        } else {
+          const { rows } = await client.query(
+            `INSERT INTO listas_rapidas (nome, responsavel, itens, total_itens) VALUES ($1, $2, $3, $4) RETURNING *`,
+            [nome || 'Nova Lista', responsavel || 'Estoque', itensJson, total]
+          );
+          return res.json(rows[0]);
+        }
+      } finally {
+        client.release();
+      }
+    } catch (e: any) {
+      console.error('Erro ao salvar lista rapida:', e.message);
+      return res.status(500).json({ error: 'Falha no banco de dados' });
+    }
+  }
+  return res.status(500).json({ error: 'DB não configurado' });
+});
+
+apiRouter.delete('/listas-rapidas/:id', async (req: Request, res: Response) => {
+  const pool = getDbPool();
+  if (pool) {
+    try {
+      const client = await pool.connect();
+      try {
+        await client.query('DELETE FROM listas_rapidas WHERE id=$1', [req.params.id]);
+        return res.json({ success: true });
+      } finally {
+        client.release();
+      }
+    } catch (e: any) {
+      console.error('Erro ao excluir lista rapida:', e.message);
+      return res.status(500).json({ error: 'Falha no banco de dados' });
+    }
+  }
+  return res.status(500).json({ error: 'DB não configurado' });
+});
+
+apiRouter.get('/listas-rapidas/lookup-item/:code', async (req: Request, res: Response) => {
+  const code = req.params.code;
+  if (!code) return res.json({ found: false });
+  const pool = getDbPool();
+  if (pool) {
+    try {
+      const client = await pool.connect();
+      try {
+        const { rows } = await client.query(`
+          SELECT codigo_atual, descricao, locacao, quantidade 
+          FROM produtos 
+          WHERE UPPER(codigo_atual) = UPPER($1) OR UPPER(codigo_atual) = UPPER($1) || 'E' OR UPPER(codigo_atual) || 'E' = UPPER($1)
+             OR UPPER(codigo_fabrica) = UPPER($1) OR UPPER(codigo_fabrica) = UPPER($1) || 'E' OR UPPER(codigo_fabrica) || 'E' = UPPER($1)
+             OR UPPER(codigo_barras_atual) = UPPER($1) OR UPPER(codigo_barras_atual) = UPPER($1) || 'E' OR UPPER(codigo_barras_atual) || 'E' = UPPER($1)
+          LIMIT 1
+        `, [code.trim()]);
+        
+        if (rows.length > 0) {
+          return res.json({ 
+            found: true, 
+            codigo: rows[0].codigo_atual, 
+            descricao: rows[0].descricao, 
+            locacao: rows[0].locacao, 
+            quantidade: rows[0].quantidade 
+          });
+        }
+      } finally {
+        client.release();
+      }
+    } catch (e: any) {
+      console.error('Erro no lookup-item:', e.message);
+    }
+  }
+  return res.json({ found: false });
 });
 
 // ==========================================
@@ -301,21 +414,23 @@ apiRouter.post('/produtos/scan', async (req: Request, res: Response) => {
         // ETAPA 1: Código atual (código de barras, código interno, código de fábrica, códigos alternativos ou códigos vinculados ativos)
         const etapa1 = await client.query(`
           SELECT * FROM produtos 
-          WHERE UPPER(codigo_barras_atual) = UPPER($1) 
-             OR UPPER(codigo_atual) = UPPER($1)
-             OR UPPER(codigo_fabrica) = UPPER($1)
+          WHERE UPPER(codigo_barras_atual) = UPPER($1) OR UPPER(codigo_barras_atual) = UPPER($1) || 'E' OR UPPER(codigo_barras_atual) || 'E' = UPPER($1)
+             OR UPPER(codigo_atual) = UPPER($1) OR UPPER(codigo_atual) = UPPER($1) || 'E' OR UPPER(codigo_atual) || 'E' = UPPER($1)
+             OR UPPER(codigo_fabrica) = UPPER($1) OR UPPER(codigo_fabrica) = UPPER($1) || 'E' OR UPPER(codigo_fabrica) || 'E' = UPPER($1)
              OR codigos_alternativos ILIKE '%' || $1 || '%'
+             OR codigos_alternativos ILIKE '%' || $1 || 'E%'
+             OR codigos_alternativos ILIKE '%' || REGEXP_REPLACE(UPPER($1), 'E$', '') || '%'
              OR (LENGTH($2) >= 4 AND (
-                  REPLACE(REPLACE(REPLACE(codigo_barras_atual, ' ', ''), '-', ''), '.', '') = $2
-               OR REPLACE(REPLACE(REPLACE(codigo_atual, ' ', ''), '-', ''), '.', '') = $2
-               OR REPLACE(REPLACE(REPLACE(codigo_fabrica, ' ', ''), '-', ''), '.', '') = $2
+                  REPLACE(REPLACE(REPLACE(codigo_barras_atual, ' ', ''), '-', ''), '.', '') = $2 OR REPLACE(REPLACE(REPLACE(codigo_barras_atual, ' ', ''), '-', ''), '.', '') = $2 || 'E' OR REPLACE(REPLACE(REPLACE(codigo_barras_atual, ' ', ''), '-', ''), '.', '') || 'E' = $2
+               OR REPLACE(REPLACE(REPLACE(codigo_atual, ' ', ''), '-', ''), '.', '') = $2 OR REPLACE(REPLACE(REPLACE(codigo_atual, ' ', ''), '-', ''), '.', '') = $2 || 'E' OR REPLACE(REPLACE(REPLACE(codigo_atual, ' ', ''), '-', ''), '.', '') || 'E' = $2
+               OR REPLACE(REPLACE(REPLACE(codigo_fabrica, ' ', ''), '-', ''), '.', '') = $2 OR REPLACE(REPLACE(REPLACE(codigo_fabrica, ' ', ''), '-', ''), '.', '') = $2 || 'E' OR REPLACE(REPLACE(REPLACE(codigo_fabrica, ' ', ''), '-', ''), '.', '') || 'E' = $2
                OR REPLACE(REPLACE(REPLACE(codigos_alternativos, ' ', ''), '-', ''), '.', '') LIKE '%' || $2 || '%'
              ))
              OR id IN (
                SELECT produto_id FROM codigos_produto 
                WHERE ativo = true AND (
-                 UPPER(codigo) = UPPER($1) OR 
-                 (LENGTH($2) >= 4 AND REPLACE(REPLACE(REPLACE(codigo, ' ', ''), '-', ''), '.', '') = $2)
+                 UPPER(codigo) = UPPER($1) OR UPPER(codigo) = UPPER($1) || 'E' OR UPPER(codigo) || 'E' = UPPER($1) OR
+                 (LENGTH($2) >= 4 AND (REPLACE(REPLACE(REPLACE(codigo, ' ', ''), '-', ''), '.', '') = $2 OR REPLACE(REPLACE(REPLACE(codigo, ' ', ''), '-', ''), '.', '') = $2 || 'E' OR REPLACE(REPLACE(REPLACE(codigo, ' ', ''), '-', ''), '.', '') || 'E' = $2))
                )
              )
           LIMIT 1
@@ -343,7 +458,7 @@ apiRouter.post('/produtos/scan', async (req: Request, res: Response) => {
           SELECT c.*, p.* 
           FROM codigos_produto c
           JOIN produtos p ON p.id = c.produto_id
-          WHERE (UPPER(c.codigo) = UPPER($1) OR (LENGTH($2) >= 4 AND REPLACE(REPLACE(REPLACE(c.codigo, ' ', ''), '-', ''), '.', '') = $2))
+          WHERE (UPPER(c.codigo) = UPPER($1) OR UPPER(c.codigo) = UPPER($1) || 'E' OR UPPER(c.codigo) || 'E' = UPPER($1) OR (LENGTH($2) >= 4 AND (REPLACE(REPLACE(REPLACE(c.codigo, ' ', ''), '-', ''), '.', '') = $2 OR REPLACE(REPLACE(REPLACE(c.codigo, ' ', ''), '-', ''), '.', '') = $2 || 'E' OR REPLACE(REPLACE(REPLACE(c.codigo, ' ', ''), '-', ''), '.', '') || 'E' = $2)))
             AND c.ativo = false
           ORDER BY c.desativado_em DESC
           LIMIT 1
@@ -376,7 +491,7 @@ apiRouter.post('/produtos/scan', async (req: Request, res: Response) => {
         // ETAPA 3: Código de fábrica ou correspondência correlata
         const etapa3 = await client.query(`
           SELECT * FROM produtos 
-          WHERE UPPER(codigo_fabrica) = UPPER($1)
+          WHERE UPPER(codigo_fabrica) = UPPER($1) OR UPPER(codigo_fabrica) = UPPER($1) || 'E' OR UPPER(codigo_fabrica) || 'E' = UPPER($1)
           LIMIT 1
         `, [cleanCode]);
 
