@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Calculator, Plus, Search, Trash2, Printer, Save, 
-  ChevronLeft, AlertTriangle, Check, User 
+  ChevronLeft, AlertTriangle, Check, User, Camera 
 } from 'lucide-react';
 import { Product, Orcamento, OrcamentoItem } from '../../types';
 import { apiService } from '../../services/apiService';
+import { beepService } from '../../services/beepService';
 
 interface OrcamentoViewProps {
   products: Product[];
@@ -24,6 +25,7 @@ export const OrcamentoView: React.FC<OrcamentoViewProps> = ({
   const [viewState, setViewState] = useState<'list' | 'edit'>('list');
   const [orcamentos, setOrcamentos] = useState<Orcamento[]>([]);
   const [loading, setLoading] = useState(true);
+  const [ultimoItemBipado, setUltimoItemBipado] = useState<string>('');
   
   // List Filters
   const [filtroResponsavel, setFiltroResponsavel] = useState<string>('');
@@ -61,31 +63,74 @@ export const OrcamentoView: React.FC<OrcamentoViewProps> = ({
     setLoading(false);
   };
 
-  // Listen to external barcode scanner
+  // Listen to external barcode scanner (câmera contínua ou leitor físico)
   useEffect(() => {
-    if (externalScannedCode && viewState === 'edit') {
-      const cleanCode = externalScannedCode.trim().toUpperCase();
+    if (!externalScannedCode) return;
+
+    const processScannedCode = async (rawCode: string) => {
+      const cleanCode = rawCode.trim().toUpperCase();
+      if (!cleanCode) return;
+
+      // Se estiver na lista, inicia modo edição automaticamente
+      if (viewState === 'list') {
+        setCurrentOrcamento(prev => ({
+          nome_cliente: prev.nome_cliente || 'Cliente Balcão',
+          responsavel: prev.responsavel || 'Estoque',
+          itens: prev.itens || [],
+          total_orcamento: prev.total_orcamento || 0
+        }));
+        setViewState('edit');
+      }
+
       const codeWithoutE = cleanCode.endsWith('E') ? cleanCode.slice(0, -1) : cleanCode;
       const codeWithE = codeWithoutE + 'E';
+      const cleanAlpha = cleanCode.replace(/[^A-Z0-9]/g, '');
 
-      const match = products.find(p => {
+      // 1. Busca no cache de produtos da memória
+      let match = products.find(p => {
         const cb = p.codigo_barras_atual?.toUpperCase();
         const ca = p.codigo_atual?.toUpperCase();
         const cf = p.codigo_fabrica?.toUpperCase();
         const alt = p.codigos_alternativos?.toUpperCase();
         
+        const normCb = cb ? cb.replace(/[^A-Z0-9]/g, '') : '';
+        const normCa = ca ? ca.replace(/[^A-Z0-9]/g, '') : '';
+        const normCf = cf ? cf.replace(/[^A-Z0-9]/g, '') : '';
+
         return (
           cb === codeWithoutE || cb === codeWithE ||
           ca === codeWithoutE || ca === codeWithE ||
           cf === codeWithoutE || cf === codeWithE ||
-          alt?.includes(codeWithoutE) || alt?.includes(codeWithE)
+          alt?.includes(codeWithoutE) || alt?.includes(codeWithE) ||
+          (cleanAlpha.length >= 4 && (normCb === cleanAlpha || normCa === cleanAlpha || normCf === cleanAlpha))
         );
       });
-      if (match) {
-        addItem(match);
+
+      // 2. Se não encontrou no cache local, busca no servidor
+      if (!match) {
+        try {
+          const scanRes = await apiService.scanCode(cleanCode);
+          if (scanRes && scanRes.product) {
+            match = scanRes.product;
+          }
+        } catch (err) {
+          console.error('Erro na busca remota do código bipado no orçamento:', err);
+        }
       }
+
+      if (match) {
+        beepService.playSuccess();
+        addItem(match);
+        setUltimoItemBipado(match.descricao || match.codigo_atual);
+        setTimeout(() => setUltimoItemBipado(''), 4000);
+      } else {
+        beepService.playError();
+      }
+
       onClearExternalScannedCode();
-    }
+    };
+
+    processScannedCode(externalScannedCode);
   }, [externalScannedCode, viewState, products]);
 
   const searchResults = useMemo(() => {
@@ -110,22 +155,42 @@ export const OrcamentoView: React.FC<OrcamentoViewProps> = ({
 
   const addItem = (p: Product) => {
     const defaultPrice = p.preco_sugerido || p.preco_tabela || p.preco_minimo || 0;
-    const newItem: OrcamentoItem = {
-      id: `item-${Date.now()}`,
-      produto_id: p.id,
-      descricao: p.descricao,
-      quantidade: 1,
-      preco_tabela: p.preco_tabela,
-      preco_sugerido: p.preco_sugerido,
-      preco_minimo: p.preco_minimo,
-      valor_unitario: defaultPrice,
-      subtotal: defaultPrice
-    };
+    setCurrentOrcamento(prev => {
+      const currentItens = prev.itens || [];
+      const existingIndex = currentItens.findIndex(it => it.produto_id === p.id);
 
-    setCurrentOrcamento(prev => ({
-      ...prev,
-      itens: [...(prev.itens || []), newItem]
-    }));
+      if (existingIndex >= 0) {
+        const updated = [...currentItens];
+        const newQty = (updated[existingIndex].quantidade || 1) + 1;
+        const unitVal = updated[existingIndex].valor_unitario || defaultPrice;
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          quantidade: newQty,
+          subtotal: newQty * unitVal
+        };
+        return {
+          ...prev,
+          itens: updated
+        };
+      }
+
+      const newItem: OrcamentoItem = {
+        id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        produto_id: p.id,
+        descricao: p.descricao,
+        quantidade: 1,
+        preco_tabela: p.preco_tabela,
+        preco_sugerido: p.preco_sugerido,
+        preco_minimo: p.preco_minimo,
+        valor_unitario: defaultPrice,
+        subtotal: defaultPrice
+      };
+
+      return {
+        ...prev,
+        itens: [...currentItens, newItem]
+      };
+    });
     setSearchTerm('');
     setShowDropdown(false);
   };
@@ -422,10 +487,34 @@ export const OrcamentoView: React.FC<OrcamentoViewProps> = ({
                 </div>
               )}
             </div>
-            <button onClick={onOpenQuickScan} className="bg-slate-800 dark:bg-slate-700 text-white p-2.5 rounded-xl hover:bg-slate-700 transition" title="Bipar com Câmera">
-              <Calculator className="h-5 w-5" />
+            <button 
+              type="button" 
+              onClick={onOpenQuickScan} 
+              className="bg-indigo-600 dark:bg-indigo-600 text-white px-3.5 py-2.5 rounded-xl hover:bg-indigo-500 transition flex items-center gap-1.5 shadow-md font-bold text-xs shrink-0" 
+              title="Bipar código de barras com a Câmera"
+            >
+              <Camera className="h-4 w-4" />
+              <span>Bipar</span>
             </button>
           </div>
+
+          {ultimoItemBipado && (
+            <div className="mt-2.5 p-2.5 rounded-xl bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs font-semibold flex items-center justify-between gap-2 animate-fadeIn">
+              <div className="flex items-center gap-2">
+                <Check className="h-4 w-4 shrink-0 text-emerald-400" />
+                <span>
+                  Adicionado: <strong className="text-white">{ultimoItemBipado}</strong> (+1 un)
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={onOpenQuickScan}
+                className="text-[11px] text-emerald-400 hover:text-emerald-300 underline font-bold"
+              >
+                Bipar mais peças
+              </button>
+            </div>
+          )}
         </div>
 
         <div className="hidden sm:block overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 print:border-none print:overflow-visible">

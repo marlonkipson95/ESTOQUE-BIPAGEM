@@ -123,9 +123,18 @@ export default function App() {
 
       // Route intelligence
       if (activeModule === 'consulta') {
-        setConsultaFilters(prev => ({ ...prev, searchTerm: code }));
+        setConsultaFilters(prev => ({
+          ...prev,
+          searchTerm: code,
+          corredor: '',
+          baia: '',
+          nivel: '',
+          locacao: '',
+        }));
       } else if (activeModule === 'orcamento') {
-        // Stay in orcamento to add the item
+        // Permanece no orçamento para inserir o item
+      } else if (activeModule === 'anotacoes') {
+        // Permanece nas anotações para inserir o item continuamente
       } else {
         setActiveModule('bipagem');
       }
@@ -236,6 +245,8 @@ export default function App() {
               onResetFilters={handleResetConsultaFilters}
               onSelectProduct={p => setSelectedProduct(p)}
               onOpenQuickScan={() => setIsCameraScannerOpen(true)}
+              externalScannedCode={incomingScannedCode}
+              onClearExternalScannedCode={() => setIncomingScannedCode('')}
             />
           )}
 

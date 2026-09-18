@@ -155,6 +155,20 @@ export async function initDatabaseSchema(): Promise<void> {
       );
     `);
 
+    // 5. Tabela listas_rapidas (Anotações rápidas para bipagem)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS listas_rapidas (
+        id SERIAL PRIMARY KEY,
+        nome VARCHAR(150) NOT NULL,
+        responsavel VARCHAR(100) DEFAULT 'Estoque',
+        itens JSONB NOT NULL DEFAULT '[]'::jsonb,
+        total_itens INTEGER DEFAULT 0,
+        criado_em TIMESTAMPTZ DEFAULT NOW(),
+        atualizado_em TIMESTAMPTZ DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS idx_listas_rapidas_criado_em ON listas_rapidas(criado_em DESC);
+    `);
+
     await client.query(`
       DO $$ BEGIN
         ALTER TABLE movimentacoes ALTER COLUMN produto_id DROP NOT NULL;

@@ -2,10 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   ClipboardList, Plus, Search, Trash2, Printer, Save, 
   ChevronLeft, Check, AlertCircle, Camera, MapPin, Tag, 
-  FileText, Calendar, Sparkles, RefreshCw, X
+  FileText, Calendar, Sparkles, RefreshCw, X, Edit3
 } from 'lucide-react';
 import { QuickList, QuickListItem } from '../../types';
 import { apiService } from '../../services/apiService';
+import { beepService } from '../../services/beepService';
 
 interface AnotacoesViewProps {
   onOpenQuickScan: () => void;
@@ -34,6 +35,15 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [mensagemSucesso, setMensagemSucesso] = useState('');
+  const [ultimoItemAdicionado, setUltimoItemAdicionado] = useState('');
+
+  // Edição inline de itens da lista
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editItemValues, setEditItemValues] = useState<{
+    codigo: string;
+    locacao: string;
+    comentario: string;
+  }>({ codigo: '', locacao: '', comentario: '' });
 
   // Lista atualmente aberta para edição
   const [currentLista, setCurrentLista] = useState<QuickList>({
@@ -73,13 +83,69 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
     }
   };
 
-  // Efeito para receber código bipado externamente (via modal de câmera ou leitor)
+  // Efeito para receber código bipado externamente (via modal de câmera ou leitor de código de barras)
+  // Adiciona automaticamente o item e mantém pronto para o próximo bipe contínuo
   useEffect(() => {
-    if (externalScannedCode && viewState === 'edit') {
-      setItemCodigo(externalScannedCode);
-      executarLookup(externalScannedCode);
+    if (!externalScannedCode) return;
+
+    const processScannedCode = async (rawCode: string) => {
+      const clean = rawCode.trim();
+      if (!clean) return;
+
+      beepService.playSuccess();
+
+      // Se estiver na visualização em lista, cria/abre automaticamente a lista
+      if (viewState === 'list') {
+        const dataAtual = new Date().toLocaleDateString('pt-BR');
+        setCurrentLista(prev => ({
+          nome: prev.nome || `Anotação ${dataAtual}`,
+          responsavel: prev.responsavel || 'Estoque',
+          itens: prev.itens || []
+        }));
+        setViewState('edit');
+      }
+
+      // Lookup rápido no banco local para identificar se tem cadastro e locação
+      let locacao = '';
+      let cadastrado = false;
+      try {
+        const info = await apiService.lookupItemRapido(clean);
+        if (info.found) {
+          cadastrado = true;
+          locacao = info.locacao || '';
+        }
+      } catch (err) {
+        console.error('Erro no lookup de bipe rápido:', err);
+      }
+
+      const novoItem: QuickListItem = {
+        id: 'item_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+        codigo: clean,
+        locacao: locacao,
+        comentario: '',
+        cadastrado: cadastrado,
+        criado_em: new Date().toISOString()
+      };
+
+      // Insere o item automaticamente no topo da lista
+      setCurrentLista(prev => ({
+        ...prev,
+        itens: [novoItem, ...(prev.itens || [])]
+      }));
+
+      // Limpa campos e mantém pronto para novo bipe
+      setItemCodigo('');
+      setItemLocacao('');
+      setItemComentario('');
+      setItemInfoLookup(null);
+      setUltimoItemAdicionado(clean);
+      setTimeout(() => setUltimoItemAdicionado(''), 4000);
+      setTimeout(() => codigoInputRef.current?.focus(), 150);
+
       if (onClearExternalScannedCode) onClearExternalScannedCode();
-    }
+    };
+
+    processScannedCode(externalScannedCode);
   }, [externalScannedCode, viewState]);
 
   // Executa busca rápida no banco local (sem Bluesoft Cosmos)
@@ -172,6 +238,58 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
       ...prev,
       itens: prev.itens.filter(i => i.id !== itemId)
     }));
+    if (editingItemId === itemId) {
+      setEditingItemId(null);
+    }
+  };
+
+  const handleStartEditItem = (item: QuickListItem) => {
+    setEditingItemId(item.id);
+    setEditItemValues({
+      codigo: item.codigo,
+      locacao: item.locacao || '',
+      comentario: item.comentario || ''
+    });
+  };
+
+  const handleCancelEditItem = () => {
+    setEditingItemId(null);
+  };
+
+  const handleSaveEditItem = async (itemId: string) => {
+    const cleanCod = editItemValues.codigo.trim();
+    if (!cleanCod) {
+      alert('O código da peça não pode ficar em branco.');
+      return;
+    }
+
+    let cadastrado = false;
+    let locacaoAuto = editItemValues.locacao.trim();
+    try {
+      const info = await apiService.lookupItemRapido(cleanCod);
+      if (info.found) {
+        cadastrado = true;
+        if (!locacaoAuto && info.locacao) locacaoAuto = info.locacao;
+      }
+    } catch (e) {
+      // ignore
+    }
+
+    setCurrentLista(prev => ({
+      ...prev,
+      itens: prev.itens.map(it => {
+        if (it.id !== itemId) return it;
+        return {
+          ...it,
+          codigo: cleanCod,
+          locacao: locacaoAuto,
+          comentario: editItemValues.comentario.trim(),
+          cadastrado: cadastrado
+        };
+      })
+    }));
+
+    setEditingItemId(null);
   };
 
   const handleSalvarLista = async () => {
@@ -412,6 +530,27 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
         </div>
       )}
 
+      {ultimoItemAdicionado && (
+        <div className="p-3 rounded-xl bg-indigo-950/60 border border-indigo-500/50 text-indigo-200 text-xs font-semibold flex items-center justify-between gap-2 animate-fadeIn">
+          <div className="flex items-center gap-2">
+            <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-600 text-white text-xs">
+              <Check className="h-3.5 w-3.5" />
+            </span>
+            <span>
+              Item <strong className="text-white font-mono">{ultimoItemAdicionado}</strong> adicionado à lista! Pronto para continuar bipando...
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={onOpenQuickScan}
+            className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition flex items-center gap-1 shrink-0"
+          >
+            <Camera className="h-3.5 w-3.5" />
+            Bipar Próximo
+          </button>
+        </div>
+      )}
+
       {/* Formulário de Adição Rápida */}
       <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 sm:p-5 shadow-md">
         <div className="flex items-center justify-between mb-3">
@@ -551,57 +690,134 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
           </div>
         ) : (
           <>
-            {/* 1. VISUALIZAÇÃO EM CARDS PARA CELULAR (sm:hidden) - Perfeita legibilidade, sem quebra de texto */}
+            {/* 1. VISUALIZAÇÃO EM CARDS PARA CELULAR (sm:hidden) */}
             <div className="sm:hidden divide-y divide-slate-800/80">
-              {currentLista.itens.map((item, idx) => (
-                <div key={item.id} className="p-4 space-y-2.5 hover:bg-slate-800/30 transition">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700">
-                        #{currentLista.itens.length - idx}
-                      </span>
-                      <span className="font-mono text-sm font-bold text-white tracking-wide">
-                        {item.codigo}
-                      </span>
-                      {item.cadastrado ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded whitespace-nowrap">
-                          <Check className="h-3 w-3" /> No Sistema
+              {currentLista.itens.map((item, idx) => {
+                const isEditing = editingItemId === item.id;
+
+                if (isEditing) {
+                  return (
+                    <div key={item.id} className="p-4 space-y-3 bg-slate-800/80 border border-indigo-500/50 rounded-xl my-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-indigo-300">
+                          Editando Item #{currentLista.itens.length - idx}
                         </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-400 bg-slate-800 px-2 py-0.5 rounded whitespace-nowrap">
-                          Avulso
-                        </span>
-                      )}
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleSaveEditItem(item.id)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition"
+                            title="Salvar alterações"
+                          >
+                            <Check className="h-3.5 w-3.5" /> Salvar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleCancelEditItem}
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs font-semibold transition"
+                            title="Cancelar edição"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] text-slate-400 font-semibold block mb-1">Código da Peça *</label>
+                        <input
+                          type="text"
+                          value={editItemValues.codigo}
+                          onChange={e => setEditItemValues(prev => ({ ...prev, codigo: e.target.value }))}
+                          className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-1.5 text-xs text-white font-mono focus:border-indigo-500 focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] text-slate-400 font-semibold block mb-1">Locação Física</label>
+                        <input
+                          type="text"
+                          value={editItemValues.locacao}
+                          onChange={e => setEditItemValues(prev => ({ ...prev, locacao: e.target.value }))}
+                          placeholder="Ex: I-032-3 ou Corredor A"
+                          className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-1.5 text-xs text-white focus:border-indigo-500 focus:outline-none"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] text-slate-400 font-semibold block mb-1">Comentário / Observação</label>
+                        <input
+                          type="text"
+                          value={editItemValues.comentario}
+                          onChange={e => setEditItemValues(prev => ({ ...prev, comentario: e.target.value }))}
+                          placeholder="Ex: caixa danificada..."
+                          className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-1.5 text-xs text-white focus:border-indigo-500 focus:outline-none"
+                        />
+                      </div>
                     </div>
-                    <button
-                      onClick={() => handleRemoverItem(item.id)}
-                      className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition shrink-0"
-                      title="Remover item da lista"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                  );
+                }
+
+                return (
+                  <div key={item.id} className="p-4 space-y-2.5 hover:bg-slate-800/30 transition">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700">
+                          #{currentLista.itens.length - idx}
+                        </span>
+                        <span className="font-mono text-sm font-bold text-white tracking-wide">
+                          {item.codigo}
+                        </span>
+                        {item.cadastrado ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded whitespace-nowrap">
+                            <Check className="h-3 w-3" /> No Sistema
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-400 bg-slate-800 px-2 py-0.5 rounded whitespace-nowrap">
+                            Avulso
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => handleStartEditItem(item)}
+                          className="p-1.5 rounded-lg text-slate-400 hover:text-indigo-400 hover:bg-slate-800 transition"
+                          title="Editar item"
+                        >
+                          <Edit3 className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoverItem(item.id)}
+                          className="p-1.5 rounded-lg text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition"
+                          title="Remover item da lista"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {item.locacao && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-slate-400 font-semibold">Locação:</span>
+                        <span className="inline-flex items-center gap-1 font-mono font-bold text-xs text-indigo-300 bg-indigo-950/40 px-2 py-0.5 rounded border border-indigo-800/40 whitespace-nowrap">
+                          <MapPin className="h-3 w-3 text-indigo-400" />
+                          {item.locacao}
+                        </span>
+                      </div>
+                    )}
+
+                    {item.comentario && (
+                      <div className="bg-slate-800/50 rounded-lg px-2.5 py-1.5 border border-slate-700/50 text-xs text-slate-300 break-words">
+                        {item.comentario}
+                      </div>
+                    )}
                   </div>
-
-                  {item.locacao && (
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] text-slate-400 font-semibold">Locação:</span>
-                      <span className="inline-flex items-center gap-1 font-mono font-bold text-xs text-indigo-300 bg-indigo-950/40 px-2 py-0.5 rounded border border-indigo-800/40 whitespace-nowrap">
-                        <MapPin className="h-3 w-3 text-indigo-400" />
-                        {item.locacao}
-                      </span>
-                    </div>
-                  )}
-
-                  {item.comentario && (
-                    <div className="bg-slate-800/50 rounded-lg px-2.5 py-1.5 border border-slate-700/50 text-xs text-slate-300 break-words">
-                      {item.comentario}
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
 
-            {/* 2. TABELA COMPLETA PARA TABLET E DESKTOP (hidden sm:block) - Com rolagem horizontal segura e sem quebra */}
+            {/* 2. TABELA COMPLETA PARA TABLET E DESKTOP (hidden sm:block) */}
             <div className="hidden sm:block overflow-x-auto">
               <table className="w-full text-left text-xs min-w-[620px]">
                 <thead className="bg-slate-800/60 text-slate-400 font-semibold border-b border-slate-800">
@@ -611,53 +827,129 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                     <th className="px-4 py-3 whitespace-nowrap">Locação</th>
                     <th className="px-4 py-3 min-w-[200px]">Comentário / Observação</th>
                     <th className="px-4 py-3 text-center whitespace-nowrap">Status</th>
-                    <th className="px-4 py-3 w-16 text-right whitespace-nowrap">Ação</th>
+                    <th className="px-4 py-3 w-28 text-right whitespace-nowrap">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/60">
-                  {currentLista.itens.map((item, idx) => (
-                    <tr key={item.id} className="hover:bg-slate-800/30 transition">
-                      <td className="px-4 py-3 text-center text-slate-400 font-mono whitespace-nowrap">
-                        {currentLista.itens.length - idx}
-                      </td>
-                      <td className="px-4 py-3 font-mono font-bold text-white whitespace-nowrap">
-                        {item.codigo}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap">
-                        {item.locacao ? (
-                          <span className="inline-flex items-center gap-1 font-mono font-bold text-xs text-slate-200 bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700 whitespace-nowrap">
-                            <MapPin className="h-3 w-3 text-indigo-400" />
-                            {item.locacao}
-                          </span>
-                        ) : (
-                          <span className="text-slate-400 italic">Sem locação</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-slate-300">
-                        {item.comentario || <span className="text-slate-400 italic">—</span>}
-                      </td>
-                      <td className="px-4 py-3 text-center whitespace-nowrap">
-                        {item.cadastrado ? (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded whitespace-nowrap">
-                            <Check className="h-3 w-3" /> No Sistema
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-400 bg-slate-800 px-2 py-0.5 rounded whitespace-nowrap">
-                            Avulso / Novo
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right whitespace-nowrap">
-                        <button
-                          onClick={() => handleRemoverItem(item.id)}
-                          className="p-1 rounded text-slate-500 hover:text-rose-400 transition"
-                          title="Remover item da lista"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {currentLista.itens.map((item, idx) => {
+                    const isEditing = editingItemId === item.id;
+
+                    if (isEditing) {
+                      return (
+                        <tr key={item.id} className="bg-indigo-950/30 border-l-2 border-indigo-500">
+                          <td className="px-4 py-3 text-center text-indigo-300 font-mono whitespace-nowrap">
+                            {currentLista.itens.length - idx}
+                          </td>
+                          <td className="px-4 py-2 whitespace-nowrap">
+                            <input
+                              type="text"
+                              value={editItemValues.codigo}
+                              onChange={e => setEditItemValues(prev => ({ ...prev, codigo: e.target.value }))}
+                              className="w-full rounded-lg bg-slate-900 border border-indigo-500/80 px-2 py-1 text-xs text-white font-mono focus:outline-none"
+                            />
+                          </td>
+                          <td className="px-4 py-2 whitespace-nowrap">
+                            <input
+                              type="text"
+                              value={editItemValues.locacao}
+                              onChange={e => setEditItemValues(prev => ({ ...prev, locacao: e.target.value }))}
+                              placeholder="Locação..."
+                              className="w-full rounded-lg bg-slate-900 border border-slate-700 px-2 py-1 text-xs text-white focus:border-indigo-500 focus:outline-none"
+                            />
+                          </td>
+                          <td className="px-4 py-2">
+                            <input
+                              type="text"
+                              value={editItemValues.comentario}
+                              onChange={e => setEditItemValues(prev => ({ ...prev, comentario: e.target.value }))}
+                              placeholder="Observação..."
+                              className="w-full rounded-lg bg-slate-900 border border-slate-700 px-2 py-1 text-xs text-white focus:border-indigo-500 focus:outline-none"
+                            />
+                          </td>
+                          <td className="px-4 py-3 text-center whitespace-nowrap">
+                            <span className="text-[10px] font-bold text-amber-400">
+                              Editando
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => handleSaveEditItem(item.id)}
+                                className="p-1.5 rounded-lg text-emerald-400 hover:bg-emerald-950/50 transition"
+                                title="Salvar alterações"
+                              >
+                                <Check className="h-4 w-4" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleCancelEditItem}
+                                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-800 transition"
+                                title="Cancelar edição"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    }
+
+                    return (
+                      <tr key={item.id} className="hover:bg-slate-800/30 transition">
+                        <td className="px-4 py-3 text-center text-slate-400 font-mono whitespace-nowrap">
+                          {currentLista.itens.length - idx}
+                        </td>
+                        <td className="px-4 py-3 font-mono font-bold text-white whitespace-nowrap">
+                          {item.codigo}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          {item.locacao ? (
+                            <span className="inline-flex items-center gap-1 font-mono font-bold text-xs text-slate-200 bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700 whitespace-nowrap">
+                              <MapPin className="h-3 w-3 text-indigo-400" />
+                              {item.locacao}
+                            </span>
+                          ) : (
+                            <span className="text-slate-400 italic">Sem locação</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-slate-300">
+                          {item.comentario || <span className="text-slate-400 italic">—</span>}
+                        </td>
+                        <td className="px-4 py-3 text-center whitespace-nowrap">
+                          {item.cadastrado ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded whitespace-nowrap">
+                              <Check className="h-3 w-3" /> No Sistema
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-400 bg-slate-800 px-2 py-0.5 rounded whitespace-nowrap">
+                              Avulso / Novo
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditItem(item)}
+                              className="p-1 rounded text-slate-400 hover:text-indigo-400 hover:bg-slate-800 transition"
+                              title="Editar item"
+                            >
+                              <Edit3 className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoverItem(item.id)}
+                              className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 transition"
+                              title="Remover item da lista"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

@@ -271,16 +271,16 @@ export const ChatAssistant: React.FC = () => {
               : undefined
           }
           className={`${
-            fabPosition ? 'fixed' : 'fixed bottom-24 right-4 sm:bottom-6 sm:right-6'
-          } h-14 w-14 bg-gradient-to-tr from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-600 text-white rounded-full shadow-2xl shadow-indigo-600/50 flex items-center justify-center transition-transform z-50 transform hover:scale-105 active:scale-95 border-2 border-white/20 touch-none select-none`}
+            fabPosition ? 'fixed' : 'fixed bottom-[88px] right-3 sm:bottom-6 sm:right-6'
+          } h-12 w-12 sm:h-14 sm:w-14 bg-gradient-to-tr from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-600 text-white rounded-full shadow-2xl shadow-indigo-600/50 flex items-center justify-center transition-transform z-50 transform hover:scale-105 active:scale-95 border-2 border-white/20 touch-none select-none`}
           title="Abrir Assistente OttoDiesel (Arraste para reposicionar)"
           aria-label="Assistente OttoDiesel"
         >
-          <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+          <span className="absolute -top-1 -right-1 flex h-3 sm:h-3.5 w-3 sm:w-3.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-slate-900"></span>
+            <span className="relative inline-flex rounded-full h-3 sm:h-3.5 w-3 sm:w-3.5 bg-emerald-500 border-2 border-slate-900"></span>
           </span>
-          <Bot size={26} />
+          <Bot className="w-5 h-5 sm:w-6 sm:h-6" />
         </button>
       )}
 

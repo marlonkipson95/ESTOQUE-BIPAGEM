@@ -18,6 +18,8 @@ import { LocationBadge } from '../common/LocationBadge';
 import { formatCurrency } from '../../utils/formatters';
 import { GenericProductsModal } from '../common/GenericProductsModal';
 import { AdaptivePrice } from '../common/AdaptivePrice';
+import { apiService } from '../../services/apiService';
+import { beepService } from '../../services/beepService';
 
 interface ConsultaViewProps {
   products: Product[];
@@ -27,6 +29,8 @@ interface ConsultaViewProps {
   onResetFilters: () => void;
   onSelectProduct: (product: Product) => void;
   onOpenQuickScan: () => void;
+  externalScannedCode?: string;
+  onClearExternalScannedCode?: () => void;
 }
 
 export const ConsultaView: React.FC<ConsultaViewProps> = ({
@@ -37,10 +41,22 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
   onResetFilters,
   onSelectProduct,
   onOpenQuickScan,
+  externalScannedCode = '',
+  onClearExternalScannedCode,
 }) => {
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
   const [displayLimit, setDisplayLimit] = useState(48);
   const [genericModalProduct, setGenericModalProduct] = useState<Product | null>(null);
+  const [serverProducts, setServerProducts] = useState<Product[]>([]);
+  const [isSearchingServer, setIsSearchingServer] = useState(false);
+
+  // Unifica os produtos em memória com os produtos carregados do servidor
+  const allProducts = useMemo(() => {
+    if (serverProducts.length === 0) return products;
+    const existingIds = new Set(products.map(p => p.id));
+    const extras = serverProducts.filter(p => !existingIds.has(p.id));
+    return [...extras, ...products];
+  }, [products, serverProducts]);
 
   const formatPriceOnlyNumber = (val?: number) => {
     if (val === undefined || val === null || isNaN(val)) return '0,00';
@@ -51,46 +67,125 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
     setDisplayLimit(48);
   }, [filters]);
 
+  // Efeito ao receber código bipado externamente (via Câmera ou leitor físico)
+  useEffect(() => {
+    if (!externalScannedCode) return;
+    const code = externalScannedCode.trim();
+    if (!code) return;
+
+    // Reseta filtros de corredor/baia para não ocultar a peça bipada
+    onUpdateFilters({
+      searchTerm: code,
+      corredor: '',
+      baia: '',
+      nivel: '',
+      locacao: '',
+      estoque: 'todos',
+      cadastro: 'todos',
+      tipoCodigo: 'todos',
+    });
+
+    if (onClearExternalScannedCode) onClearExternalScannedCode();
+  }, [externalScannedCode]);
+
   // Available unique locations for filter selects
   const uniqueCorredores = useMemo(() => {
-    const list = Array.from(new Set(products.map(p => p.corredor).filter(Boolean))).sort();
+    const list = Array.from(new Set(allProducts.map(p => p.corredor).filter(Boolean))).sort();
     return list;
-  }, [products]);
+  }, [allProducts]);
 
   const uniqueBaias = useMemo(() => {
-    const list = Array.from(new Set(products.map(p => p.baia).filter(Boolean))).sort();
+    const list = Array.from(new Set(allProducts.map(p => p.baia).filter(Boolean))).sort();
     return list;
-  }, [products]);
+  }, [allProducts]);
 
   const uniqueNiveis = useMemo(() => {
-    const list = Array.from(new Set(products.map(p => p.nivel).filter(Boolean))).sort();
+    const list = Array.from(new Set(allProducts.map(p => p.nivel).filter(Boolean))).sort();
     return list;
-  }, [products]);
+  }, [allProducts]);
 
-  // Combined Search & Filter logic
+  // Helper de normalização: remove pontuações, traços, barras e espaços
+  const normalize = (val?: string) => (val || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+
+  // Combined Search & Filter logic com correspondência inteligente
   const filteredProducts = useMemo(() => {
-    const term = filters.searchTerm.trim().toLowerCase();
+    const rawTerm = filters.searchTerm.trim();
+    const term = rawTerm.toLowerCase();
+    const termUpper = rawTerm.toUpperCase();
+    const termNorm = normalize(rawTerm);
+    const termWithoutE = termUpper.endsWith('E') ? termUpper.slice(0, -1) : termUpper;
+    const termWithE = termWithoutE + 'E';
+    const termNormWithoutE = termNorm.endsWith('E') ? termNorm.slice(0, -1) : termNorm;
 
-    return products.filter(product => {
+    return allProducts.filter(product => {
       // 1. Omni-Search matching:
       // - código interno atual
       // - código fábrica
       // - código barras atual
+      // - códigos alternativos
       // - descrição
       // - códigos antigos do histórico
       if (term) {
-        const matchesCurrent =
-          (product.codigo_atual && product.codigo_atual.toLowerCase().includes(term)) ||
-          (product.codigo_fabrica && product.codigo_fabrica.toLowerCase().includes(term)) ||
-          (product.codigo_barras_atual && product.codigo_barras_atual.toLowerCase().includes(term)) ||
-          (product.descricao && product.descricao.toLowerCase().includes(term)) ||
-          (product.locacao && product.locacao.toLowerCase().includes(term));
+        const ca = product.codigo_atual || '';
+        const cf = product.codigo_fabrica || '';
+        const cb = product.codigo_barras_atual || '';
+        const desc = product.descricao || '';
+        const loc = product.locacao || '';
 
-        if (!matchesCurrent) {
-          // Check historical codes for this product
-          const matchesHistory = codeHistory.some(
-            h => h.produto_id === product.id && h.codigo.toLowerCase().includes(term)
+        const caNorm = normalize(ca);
+        const cfNorm = normalize(cf);
+        const cbNorm = normalize(cb);
+
+        const matchesStandard =
+          ca.toLowerCase().includes(term) ||
+          cf.toLowerCase().includes(term) ||
+          cb.toLowerCase().includes(term) ||
+          desc.toLowerCase().includes(term) ||
+          loc.toLowerCase().includes(term);
+
+        const matchesNormalized =
+          termNorm.length >= 3 && (
+            caNorm.includes(termNorm) ||
+            cfNorm.includes(termNorm) ||
+            cbNorm.includes(termNorm) ||
+            (termNormWithoutE.length >= 3 && (
+              caNorm.includes(termNormWithoutE) ||
+              cfNorm.includes(termNormWithoutE) ||
+              cbNorm.includes(termNormWithoutE)
+            ))
           );
+
+        const matchesE =
+          ca.toUpperCase().includes(termWithoutE) || ca.toUpperCase().includes(termWithE) ||
+          cf.toUpperCase().includes(termWithoutE) || cf.toUpperCase().includes(termWithE) ||
+          cb.toUpperCase().includes(termWithoutE) || cb.toUpperCase().includes(termWithE);
+
+        // Códigos alternativos (pode ser string ou array)
+        let matchesAlt = false;
+        if (product.codigos_alternativos) {
+          const altStr = Array.isArray(product.codigos_alternativos)
+            ? product.codigos_alternativos.join(' ')
+            : String(product.codigos_alternativos);
+          const altNorm = normalize(altStr);
+          matchesAlt =
+            altStr.toLowerCase().includes(term) ||
+            (termNorm.length >= 3 && altNorm.includes(termNorm)) ||
+            (termNormWithoutE.length >= 3 && altNorm.includes(termNormWithoutE));
+        }
+
+        const isMatched = matchesStandard || matchesNormalized || matchesE || matchesAlt;
+
+        if (!isMatched) {
+          // Check historical codes for this product
+          const matchesHistory = codeHistory.some(h => {
+            if (h.produto_id !== product.id) return false;
+            const hNorm = normalize(h.codigo);
+            return (
+              h.codigo.toLowerCase().includes(term) ||
+              (termNorm.length >= 3 && hNorm.includes(termNorm)) ||
+              (termNormWithoutE.length >= 3 && hNorm.includes(termNormWithoutE))
+            );
+          });
           if (!matchesHistory) return false;
         }
       }
@@ -122,7 +217,54 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
 
       return true;
     });
-  }, [products, codeHistory, filters]);
+  }, [allProducts, codeHistory, filters]);
+
+  // Fallback remoto no banco de dados quando a pesquisa local não encontrar resultados
+  useEffect(() => {
+    const rawTerm = filters.searchTerm.trim();
+    if (!rawTerm || rawTerm.length < 2) return;
+
+    if (filteredProducts.length === 0) {
+      let isCancelled = false;
+      setIsSearchingServer(true);
+
+      const runServerSearch = async () => {
+        try {
+          // 1. Tenta scanCode direto (resolve código de fábrica, barras, alternativo)
+          const scanRes = await apiService.scanCode(rawTerm).catch(() => null);
+          if (!isCancelled && scanRes && scanRes.product) {
+            beepService.playSuccess();
+            setServerProducts(prev => {
+              if (prev.some(p => p.id === scanRes.product!.id)) return prev;
+              return [scanRes.product!, ...prev];
+            });
+            setIsSearchingServer(false);
+            return;
+          }
+
+          // 2. Tenta pesquisa geral de produtos
+          const searchRes = await apiService.getProducts({ search: rawTerm, limit: 12 }).catch(() => null);
+          if (!isCancelled && searchRes && searchRes.products && searchRes.products.length > 0) {
+            beepService.playSuccess();
+            setServerProducts(prev => {
+              const newItems = searchRes.products.filter(sp => !prev.some(p => p.id === sp.id));
+              return [...newItems, ...prev];
+            });
+          }
+        } catch (e) {
+          console.error('Erro ao buscar produto no servidor:', e);
+        } finally {
+          if (!isCancelled) setIsSearchingServer(false);
+        }
+      };
+
+      const timer = setTimeout(runServerSearch, 200);
+      return () => {
+        isCancelled = true;
+        clearTimeout(timer);
+      };
+    }
+  }, [filters.searchTerm, filteredProducts.length]);
 
   // Produtos fatiados para renderização progressiva leve e rápida
   const visibleProducts = useMemo(() => {
@@ -389,8 +531,16 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
       {/* 6. RESULTADOS DA CONSULTA */}
       <div className="space-y-3">
         <div className="flex items-center justify-between px-1">
-          <div className="text-xs md:text-sm font-semibold text-slate-500 dark:text-slate-400">
-            Mostrando <strong className="text-slate-900 dark:text-white">{filteredProducts.length}</strong> de {products.length} mercadorias
+          <div className="text-xs md:text-sm font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-2">
+            <span>
+              Mostrando <strong className="text-slate-900 dark:text-white">{filteredProducts.length}</strong> de {allProducts.length} mercadorias
+            </span>
+            {isSearchingServer && (
+              <span className="inline-flex items-center gap-1.5 text-xs text-indigo-500 dark:text-indigo-400 font-medium animate-pulse">
+                <span className="h-2 w-2 rounded-full bg-indigo-500"></span>
+                Consultando banco completo...
+              </span>
+            )}
           </div>
         </div>
 
