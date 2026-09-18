@@ -175,6 +175,24 @@ class ApiService {
     return await res.json();
   }
 
+  async desvincularCodigoBarras(
+    id: string,
+    motivo: string = 'Código de barras desvinculado manualmente'
+  ): Promise<{ success: boolean; product: Product; message: string }> {
+    const res = await fetch(`${this.baseUrl}/produtos/${encodeURIComponent(id)}/desvincular-codigo-barras`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ motivo }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Falha ao desvincular código de barras');
+    }
+
+    return await res.json();
+  }
+
   async deleteProduct(id: string): Promise<{ success: boolean; message: string }> {
     const res = await fetch(`${this.baseUrl}/produtos/${encodeURIComponent(id)}`, {
       method: 'DELETE',

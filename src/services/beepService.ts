@@ -53,6 +53,13 @@ class BeepService {
   }
 
   /**
+   * Short trigger click tone
+   */
+  playBeep() {
+    this.playSuccess(false);
+  }
+
+  /**
    * Warning / Attention tone (e.g. historical barcode or duplicate code)
    */
   playWarning(enableVibrate = true) {

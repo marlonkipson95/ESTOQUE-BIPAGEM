@@ -317,12 +317,12 @@ export const GenericProductsModal: React.FC<GenericProductsModalProps> = ({
 
                         <button
                           type="button"
-                          onClick={() => handleRemoveGeneric(rel.id, rel.descricao || rel.codigo_fabrica)}
+                          onClick={() => handleRemoveGeneric(rel.relacionado_id || rel.id, rel.descricao || rel.codigo_fabrica || rel.codigo_atual)}
                           title="Remover vínculo genérico"
-                          className="inline-flex items-center gap-1 rounded-xl p-1.5 text-rose-500 hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-950/50 transition text-xs font-medium"
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-600 hover:bg-rose-100 dark:bg-rose-950/50 dark:text-rose-400 dark:hover:bg-rose-900/60 transition border border-rose-200 dark:border-rose-900/40"
                         >
-                          <Trash2 className="h-4 w-4" />
-                          <span className="sm:hidden">Desvincular</span>
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span>Desvincular</span>
                         </button>
                       </div>
                     </div>

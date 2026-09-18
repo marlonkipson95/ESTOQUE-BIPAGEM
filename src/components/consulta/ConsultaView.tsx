@@ -12,6 +12,7 @@ import {
   ExternalLink,
   RotateCcw,
   Plus,
+  Unlink,
 } from 'lucide-react';
 import { Product, ProductCodeHistory, ConsultaFilters } from '../../types';
 import { LocationBadge } from '../common/LocationBadge';
@@ -19,6 +20,7 @@ import { formatCurrency } from '../../utils/formatters';
 import { GenericProductsModal } from '../common/GenericProductsModal';
 import { AdaptivePrice } from '../common/AdaptivePrice';
 import { apiService } from '../../services/apiService';
+import { storageService } from '../../services/storageService';
 import { beepService } from '../../services/beepService';
 
 interface ConsultaViewProps {
@@ -87,6 +89,32 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
 
     if (onClearExternalScannedCode) onClearExternalScannedCode();
   }, [externalScannedCode]);
+
+  const handleUnlinkBarcodeDirect = async (product: Product) => {
+    if (!product.codigo_barras_atual) return;
+    const barcode = product.codigo_barras_atual;
+    if (!confirm(`Deseja desvincular o código de barras "${barcode}" da peça "${product.descricao}"?`)) {
+      return;
+    }
+
+    try {
+      storageService.desvincularCodigoBarras(product.id, 'Desvinculação rápida na Consulta');
+      const updated: Product = { ...product, codigo_barras_atual: undefined };
+      setServerProducts(prev => {
+        const idx = prev.findIndex(p => p.id === product.id);
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = updated;
+          return next;
+        }
+        return [...prev, updated];
+      });
+      beepService.playSuccess();
+    } catch (err: any) {
+      beepService.playError();
+      alert('Falha ao desvincular código de barras: ' + (err?.message || err));
+    }
+  };
 
   // Available unique locations for filter selects
   const uniqueCorredores = useMemo(() => {
@@ -597,6 +625,28 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
                         </span>
                       </div>
 
+                      {/* EAN do produto com atalho para desvincular */}
+                      {product.codigo_barras_atual && (
+                        <div className="mt-2 flex items-center justify-between gap-1.5 text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-800/70 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700/80">
+                          <span className="flex items-center gap-1 font-mono text-[11px] truncate">
+                            <Barcode className="h-3.5 w-3.5 text-indigo-500 shrink-0" />
+                            <span>EAN: <strong>{product.codigo_barras_atual}</strong></span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleUnlinkBarcodeDirect(product);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-bold text-rose-600 hover:bg-rose-100/70 dark:text-rose-400 dark:hover:bg-rose-950/50 transition border border-rose-200 dark:border-rose-900/40 shrink-0"
+                            title="Desvincular código de barras deste produto"
+                          >
+                            <Unlink className="h-3 w-3" />
+                            <span>Desvincular</span>
+                          </button>
+                        </div>
+                      )}
+
                       {/* 2. DESCRIÇÃO */}
                       <h3 className="mt-2.5 text-sm sm:text-base font-bold text-slate-900 dark:text-white line-clamp-2 leading-snug">
                         {product.descricao}
@@ -721,6 +771,18 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
           onClose={() => setGenericModalProduct(null)}
           product={genericModalProduct}
           onSelectProduct={onSelectProduct}
+          onProductUpdated={(updated) => {
+            setServerProducts(prev => {
+              const idx = prev.findIndex(p => p.id === updated.id);
+              if (idx >= 0) {
+                const next = [...prev];
+                next[idx] = updated;
+                return next;
+              }
+              return [...prev, updated];
+            });
+            setGenericModalProduct(updated);
+          }}
         />
       )}
     </div>

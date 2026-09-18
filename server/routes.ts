@@ -1525,18 +1525,31 @@ apiRouter.put('/produtos/:id', async (req: Request, res: Response) => {
       }
       const prev = existing.rows[0];
 
-      // Se código de barras mudou, arquivar o anterior
-      if (codigo_barras_atual && codigo_barras_atual.trim() !== prev.codigo_barras_atual) {
-        await client.query(`
-          UPDATE codigos_produto 
-          SET ativo = false, desativado_em = NOW(), motivo = 'Alteração completa de cadastro'
-          WHERE produto_id = $1 AND tipo = 'codigo_barras' AND ativo = true
-        `, [id]);
+      // Se código de barras mudou ou foi desvinculado, atualizar/arquivar
+      let finalBarcode = prev.codigo_barras_atual;
+      if (codigo_barras_atual !== undefined) {
+        if (codigo_barras_atual === null || String(codigo_barras_atual).trim() === '') {
+          finalBarcode = null;
+          if (prev.codigo_barras_atual) {
+            await client.query(`
+              UPDATE codigos_produto 
+              SET ativo = false, desativado_em = NOW(), motivo = 'Código de barras desvinculado'
+              WHERE produto_id = $1 AND tipo = 'codigo_barras' AND ativo = true
+            `, [id]);
+          }
+        } else if (String(codigo_barras_atual).trim() !== prev.codigo_barras_atual) {
+          finalBarcode = String(codigo_barras_atual).trim();
+          await client.query(`
+            UPDATE codigos_produto 
+            SET ativo = false, desativado_em = NOW(), motivo = 'Alteração completa de cadastro'
+            WHERE produto_id = $1 AND tipo = 'codigo_barras' AND ativo = true
+          `, [id]);
 
-        await client.query(`
-          INSERT INTO codigos_produto (produto_id, tipo, codigo, ativo, motivo)
-          VALUES ($1, 'codigo_barras', $2, true, 'Alteração completa de cadastro')
-        `, [id, codigo_barras_atual.trim()]);
+          await client.query(`
+            INSERT INTO codigos_produto (produto_id, tipo, codigo, ativo, motivo)
+            VALUES ($1, 'codigo_barras', $2, true, 'Alteração completa de cadastro')
+          `, [id, finalBarcode]);
+        }
       }
 
       // Se código interno mudou, arquivar anterior
@@ -1578,7 +1591,7 @@ apiRouter.put('/produtos/:id', async (req: Request, res: Response) => {
         descricao?.trim() || prev.descricao,
         codigo_atual?.trim() || prev.codigo_atual,
         codigo_fabrica?.trim() || prev.codigo_fabrica,
-        codigo_barras_atual?.trim() || prev.codigo_barras_atual,
+        finalBarcode,
         custo_unitario !== undefined ? Number(custo_unitario) : prev.custo_unitario,
         preco_tabela !== undefined ? Number(preco_tabela) : prev.preco_tabela,
         preco_sugerido !== undefined ? Number(preco_sugerido) : prev.preco_sugerido,
@@ -1975,6 +1988,68 @@ apiRouter.post('/produtos/:id/relacionados', async (req: Request, res: Response)
   return res.status(201).json({ success: true, message: 'Produto genérico vinculado com sucesso.' });
 });
 
+// Endpoint dedicado para desvincular código de barras
+apiRouter.post('/produtos/:id/desvincular-codigo-barras', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const { motivo = 'Código de barras desvinculado manualmente', usuario = 'Operador Almoxarifado' } = req.body;
+  const pool = getDbPool();
+
+  if (pool) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const prodRes = await client.query('SELECT * FROM produtos WHERE id = $1', [id]);
+      if (prodRes.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Produto não encontrado' });
+      }
+      const prev = prodRes.rows[0];
+      const prevBarcode = prev.codigo_barras_atual;
+
+      await client.query('UPDATE produtos SET codigo_barras_atual = NULL, atualizado_em = NOW() WHERE id = $1', [id]);
+
+      if (prevBarcode) {
+        await client.query(`
+          UPDATE codigos_produto 
+          SET ativo = false, desativado_em = NOW(), motivo = $2
+          WHERE produto_id = $1 AND tipo = 'codigo_barras' AND ativo = true
+        `, [id, motivo]);
+
+        await client.query(`
+          INSERT INTO historico_alteracoes (produto_id, campo, valor_anterior, valor_novo, motivo, usuario)
+          VALUES ($1, 'codigo_barras_atual', $2, NULL, $3, $4)
+        `, [id, prevBarcode, motivo, usuario]);
+      }
+
+      await client.query('COMMIT');
+      const updated = await client.query('SELECT * FROM produtos WHERE id = $1', [id]);
+      const product = await loadProductExtras(client, updated.rows[0]);
+      return res.json({ success: true, product, message: 'Código de barras desvinculado com sucesso!' });
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      console.error('[API] Erro ao desvincular código de barras:', err.message);
+      return res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  }
+
+  // Fallback memory
+  const idx = memoryProducts.findIndex(p => p.id === id);
+  if (idx === -1) return res.status(404).json({ error: 'Produto não encontrado' });
+  memoryProducts[idx].codigo_barras_atual = undefined as any;
+  memoryProducts[idx].atualizado_em = new Date().toISOString();
+  memoryCodeHistory.forEach(c => {
+    if (c.produto_id === id && c.tipo === 'codigo_barras' && c.ativo) {
+      c.ativo = false;
+      c.desativado_em = new Date().toISOString();
+      c.motivo = motivo;
+    }
+  });
+  const updatedProd = loadMemoryProductExtras(memoryProducts[idx]);
+  return res.json({ success: true, product: updatedProd, message: 'Código de barras desvinculado com sucesso!' });
+});
+
 apiRouter.delete('/produtos/:id/relacionados/:relacionadoId', async (req: Request, res: Response) => {
   const { id, relacionadoId } = req.params;
   const pool = getDbPool();
@@ -1985,6 +2060,7 @@ apiRouter.delete('/produtos/:id/relacionados/:relacionadoId', async (req: Reques
         DELETE FROM produtos_relacionados 
         WHERE (produto_id = $1 AND relacionado_id = $2)
            OR (produto_id = $2 AND relacionado_id = $1)
+           OR (id::text = $2 AND (produto_id = $1 OR relacionado_id = $1))
       `, [id, relacionadoId]);
       return res.json({ success: true, message: 'Vínculo de produto relacionado removido.' });
     } finally {
@@ -1994,7 +2070,8 @@ apiRouter.delete('/produtos/:id/relacionados/:relacionadoId', async (req: Reques
 
   memoryRelatedProducts = memoryRelatedProducts.filter(
     r => !((r.produto_id === id && r.relacionado_id === relacionadoId) ||
-           (r.produto_id === relacionadoId && r.relacionado_id === id))
+           (r.produto_id === relacionadoId && r.relacionado_id === id) ||
+           (String(r.id) === String(relacionadoId) && (r.produto_id === id || r.relacionado_id === id)))
   );
   return res.json({ success: true, message: 'Vínculo de produto relacionado removido.' });
 });

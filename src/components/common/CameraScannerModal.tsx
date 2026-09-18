@@ -110,6 +110,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
 
         const handleDetectedCode = (rawText: string) => {
           if (!isSubscribed || hasScannedRef.current) return;
+          if (!captureRequestedRef.current) return;
           
           const text = rawText ? rawText.trim().replace(/\s+/g, '') : '';
           if (text && text.length >= 2) {
@@ -200,6 +201,20 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
       videoRef.current.srcObject = null;
     }
     setTorchOn(false);
+    captureRequestedRef.current = false;
+    setIsCapturing(false);
+  };
+
+  const handleCaptureClick = () => {
+    captureRequestedRef.current = true;
+    setIsCapturing(true);
+    beepService.playBeep();
+    setTimeout(() => {
+      if (captureRequestedRef.current) {
+        captureRequestedRef.current = false;
+        setIsCapturing(false);
+      }
+    }, 3500);
   };
 
   const toggleTorch = async () => {
@@ -291,17 +306,31 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
               <div className="absolute -bottom-1 -left-1 h-5 w-5 border-b-4 border-l-4 border-indigo-400 rounded-bl" />
               <div className="absolute -bottom-1 -right-1 h-5 w-5 border-b-4 border-r-4 border-indigo-400 rounded-br" />
 
-              {/* Red Laser Sweep Line Animation */}
-              <div className="absolute inset-x-0 top-1/2 h-0.5 shadow-[0_0_8px_#f43f5e] bg-rose-500 animate-pulse" />
+              {/* Laser Sweep Line Animation */}
+              <div
+                className={`absolute inset-x-0 top-1/2 transition-all duration-300 ${
+                  isCapturing
+                    ? 'h-1 shadow-[0_0_14px_#10b981] bg-emerald-400 animate-pulse'
+                    : 'h-0.5 shadow-[0_0_8px_#f43f5e] bg-rose-500/80 animate-pulse'
+                }`}
+              />
             </div>
           </div>
           
-          {/* Status Indicator Overlay */}
-          <div className="absolute bottom-6 inset-x-0 flex justify-center z-20 pointer-events-none">
-            <div className="inline-flex items-center gap-2 rounded-full bg-slate-900/90 px-4 py-2 text-xs font-bold text-white shadow-xl border border-slate-700/80 backdrop-blur-md">
-              <span className="h-2 w-2 rounded-full bg-emerald-400 animate-ping" />
-              <span>Aponte para o código • Leitura automática</span>
-            </div>
+          {/* Botão Capturar Código */}
+          <div className="absolute bottom-4 inset-x-0 flex justify-center z-20">
+            <button
+              type="button"
+              onClick={handleCaptureClick}
+              className={`inline-flex items-center gap-2.5 rounded-full px-7 py-3 text-sm font-black shadow-2xl transition-all active:scale-95 ${
+                isCapturing
+                  ? 'bg-emerald-500 text-white animate-pulse ring-4 ring-emerald-400/50 shadow-emerald-500/50'
+                  : 'bg-indigo-600 text-white hover:bg-indigo-500 ring-4 ring-indigo-500/30 shadow-indigo-600/50'
+              }`}
+            >
+              <Camera className="h-5 w-5" />
+              <span>{isCapturing ? 'Lendo Código...' : 'Capturar'}</span>
+            </button>
           </div>
 
           {/* Error notice */}

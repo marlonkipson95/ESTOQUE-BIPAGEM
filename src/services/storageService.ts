@@ -573,6 +573,60 @@ class StorageService {
     return { success: true, product: currentProduct, message: 'Código de barras vinculado com sucesso!' };
   }
 
+  // --- Desvincular Código de Barras de um Produto ---
+  desvincularCodigoBarras(
+    productId: string,
+    motivo: string = 'Código de barras desvinculado manualmente',
+    userName: string = 'Operador Almoxarifado'
+  ): { success: boolean; product?: Product; error?: string; message?: string } {
+    const products = this.getProducts();
+    const productIndex = products.findIndex(p => p.id === productId);
+    if (productIndex === -1) {
+      return { success: false, error: 'Produto não encontrado' };
+    }
+
+    const currentProduct = products[productIndex];
+    const prevBarcode = currentProduct.codigo_barras_atual;
+    if (!prevBarcode) {
+      return { success: true, product: currentProduct, message: 'Produto não possui código de barras vinculado.' };
+    }
+
+    const now = new Date().toISOString();
+    currentProduct.codigo_barras_atual = undefined;
+    currentProduct.atualizado_em = now;
+    products[productIndex] = currentProduct;
+    this.saveProducts(products);
+
+    const codeHistory = this.getCodeHistory();
+    const updatedHistory = codeHistory.map(h => {
+      if (h.produto_id === productId && h.tipo === 'codigo_barras' && h.ativo) {
+        return {
+          ...h,
+          ativo: false,
+          desativado_em: now,
+          motivo,
+        };
+      }
+      return h;
+    });
+    this.saveCodeHistory(updatedHistory);
+
+    this.addMovement({
+      produto_id: productId,
+      tipo: 'alteracao_codigo',
+      quantidade: currentProduct.quantidade,
+      quantidade_anterior: currentProduct.quantidade,
+      detalhes: `Código de barras "${prevBarcode}" desvinculado. Motivo: ${motivo}`,
+      usuario: userName,
+    });
+
+    apiService.desvincularCodigoBarras(productId, motivo).catch(err => {
+      console.warn('[StorageService] Desvinculação remota no PostgreSQL adiada:', err.message);
+    });
+
+    return { success: true, product: currentProduct, message: 'Código de barras desvinculado com sucesso!' };
+  }
+
   addProduct(productData: Partial<Product> & { descricao: string }): Product {
     return this.saveProduct(productData);
   }
