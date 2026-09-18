@@ -903,7 +903,7 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
               onChange={e => setInputCode(e.target.value)}
               placeholder="BIPE OU DIGITE O CÓDIGO (EAN / FÁBRICA)"
               disabled={isLoading}
-              className="w-full rounded-2xl border-2 sm:border-4 border-indigo-600/30 bg-slate-50 px-4 py-3.5 sm:px-6 sm:py-5 text-center font-mono text-base sm:text-2xl font-black tracking-wider text-slate-900 placeholder-slate-400 transition focus:border-indigo-600 focus:bg-white focus:outline-none dark:bg-slate-800 dark:text-white"
+              className="w-full rounded-2xl border-2 sm:border-4 border-indigo-600/30 bg-white px-4 py-3.5 sm:px-6 sm:py-5 text-center font-mono text-base sm:text-2xl font-black tracking-wider text-slate-900 placeholder-slate-400 transition focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:bg-slate-800 dark:text-white dark:focus:bg-slate-800 dark:focus:border-indigo-500"
             />
           </div>
 
@@ -1178,7 +1178,7 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
               </div>
 
               {/* Informações Complementares dos Códigos e Estoque */}
-              <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              <div className="mt-5 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 text-xs">
                 <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                   <div className="flex items-center justify-between">
                     <span className="block text-slate-400 font-medium">Cód. Barras</span>

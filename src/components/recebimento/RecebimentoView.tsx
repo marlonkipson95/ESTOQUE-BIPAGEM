@@ -189,7 +189,7 @@ export const RecebimentoView: React.FC<RecebimentoViewProps> = ({
               value={inputCode}
               onChange={e => setInputCode(e.target.value)}
               placeholder="BIPAR MERCADORIA (LEITOR USB OU DIGITE)"
-              className="w-full rounded-2xl border-4 border-emerald-600/30 bg-slate-50 px-6 py-5 text-center font-mono text-xl md:text-2xl font-black tracking-wider text-slate-900 placeholder-slate-400 transition focus:border-emerald-600 focus:bg-white focus:outline-none dark:bg-slate-800 dark:text-white"
+              className="w-full rounded-2xl border-4 border-emerald-600/30 bg-white px-6 py-5 text-center font-mono text-xl md:text-2xl font-black tracking-wider text-slate-900 placeholder-slate-400 transition focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:bg-slate-800 dark:text-white dark:focus:bg-slate-800 dark:focus:border-emerald-500"
             />
           </div>
 

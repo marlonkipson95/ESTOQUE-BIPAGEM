@@ -208,7 +208,7 @@ export default function App() {
       />
 
       {/* Main Content Stage */}
-      <div className="flex flex-1 flex-col overflow-hidden">
+      <div className="flex flex-1 min-w-0 flex-col overflow-hidden">
         {/* PWA In-App Install Banner */}
         <PWAInstallBanner />
 
@@ -223,7 +223,7 @@ export default function App() {
         />
 
         {/* Scrollable Workspace Container */}
-        <main className="flex-1 overflow-y-auto px-3 py-4 pb-24 md:px-8 md:py-6 md:pb-8 overscroll-y-contain">
+        <main className="flex-1 min-w-0 overflow-y-auto px-3 py-4 pb-24 md:px-6 lg:px-8 md:py-6 md:pb-8 overscroll-y-contain">
           {activeModule === 'dashboard' && (
             <DashboardView
               products={products}

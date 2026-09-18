@@ -469,7 +469,7 @@ export const OrcamentoView: React.FC<OrcamentoViewProps> = ({
                 value={searchTerm}
                 onChange={e => { setSearchTerm(e.target.value); setShowDropdown(true); }}
                 onFocus={() => setShowDropdown(true)}
-                className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 pl-10 p-2.5 text-sm font-bold text-slate-900 dark:text-white"
+                className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 pl-10 p-2.5 text-sm font-bold text-slate-900 dark:text-white focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:focus:bg-slate-900"
                 placeholder="Buscar por descrição, part number ou EAN..."
               />
               {showDropdown && searchResults.length > 0 && (

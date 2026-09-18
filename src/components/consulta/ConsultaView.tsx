@@ -378,7 +378,7 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
               value={filters.searchTerm}
               onChange={e => onUpdateFilters({ searchTerm: e.target.value })}
               placeholder="Pesquisar por código, código de barras, código de fábrica ou descrição..."
-              className="w-full rounded-xl border-2 border-slate-200 bg-slate-50 py-3.5 pl-11 pr-10 text-sm md:text-base font-medium text-slate-900 placeholder-slate-400 transition focus:border-indigo-600 focus:bg-white focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:border-indigo-500"
+              className="w-full rounded-xl border-2 border-slate-200 bg-white py-3.5 pl-11 pr-10 text-sm md:text-base font-medium text-slate-900 placeholder-slate-400 transition focus:border-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800 dark:text-white dark:focus:bg-slate-800 dark:focus:border-indigo-500 dark:focus:ring-indigo-500/30"
             />
             {filters.searchTerm && (
               <button
@@ -590,7 +590,7 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
           </div>
         ) : (
           <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-3.5 sm:gap-4">
               {visibleProducts.map(product => {
                 const isOutOfStock = product.quantidade <= 0;
                 const isLowStock = !isOutOfStock && product.quantidade <= (product.estoque_minimo || 5);
