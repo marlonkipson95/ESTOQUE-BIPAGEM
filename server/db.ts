@@ -88,6 +88,13 @@ export async function initDatabaseSchema(): Promise<void> {
     // Migração de coluna se a tabela produtos já existir
     await client.query(`
       ALTER TABLE produtos ADD COLUMN IF NOT EXISTS codigos_alternativos TEXT DEFAULT '';
+      ALTER TABLE produtos ADD COLUMN IF NOT EXISTS estoque_fisico INTEGER DEFAULT 0;
+      ALTER TABLE produtos ADD COLUMN IF NOT EXISTS preco_tabela NUMERIC(12, 2) DEFAULT 0.00;
+      ALTER TABLE produtos ADD COLUMN IF NOT EXISTS preco_sugerido NUMERIC(12, 2) DEFAULT 0.00;
+      ALTER TABLE produtos ADD COLUMN IF NOT EXISTS preco_minimo NUMERIC(12, 2) DEFAULT 0.00;
+      ALTER TABLE produtos ADD COLUMN IF NOT EXISTS ncm VARCHAR(20) DEFAULT '';
+      ALTER TABLE produtos ADD COLUMN IF NOT EXISTS ultima_data_venda VARCHAR(20) DEFAULT '';
+      ALTER TABLE produtos ADD COLUMN IF NOT EXISTS ultima_data_compra VARCHAR(20) DEFAULT '';
     `);
 
     // 2. Tabela codigos_produto (Histórico de códigos: antigos continuam pesquisáveis, exclusão em cascata)

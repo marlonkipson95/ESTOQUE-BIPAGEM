@@ -39,8 +39,12 @@ export interface Product {
   preco_tabela?: number; // Preço Tabela
   preco_sugerido?: number; // Preço Sugerido
   preco_minimo?: number; // Preço Mínimo
-  quantidade: number; // Current stock count
+  quantidade: number; // Current stock count (Estoque Contábil)
+  estoque_fisico?: number; // Estoque Físico
   estoque_minimo?: number; // Minimum safe stock
+  ncm?: string; // NCM
+  ultima_data_venda?: string;
+  ultima_data_compra?: string;
   codigo_barras_atual: string; // Current active barcode / EAN (e.g. '7891234567890')
   codigos_alternativos?: string[]; // Códigos alternativos adicionais apontando para este mesmo produto
   produtos_relacionados?: RelatedProductSummary[]; // Lista de produtos genéricos / similares relacionados

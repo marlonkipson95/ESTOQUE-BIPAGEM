@@ -971,6 +971,13 @@ apiRouter.post('/produtos', async (req: Request, res: Response) => {
     custo_unitario = 0,
     quantidade = 0,
     estoque_minimo = 0,
+    estoque_fisico = 0,
+    ncm = '',
+    preco_tabela = 0,
+    preco_sugerido = 0,
+    preco_minimo = 0,
+    ultima_data_venda = '',
+    ultima_data_compra = '',
     corredor = '',
     baia = '',
     nivel = '',
@@ -1048,10 +1055,12 @@ apiRouter.post('/produtos', async (req: Request, res: Response) => {
       const insertRes = await client.query(`
         INSERT INTO produtos (
           id, codigo_atual, codigo_fabrica, codigo_barras_atual, 
-          descricao, custo_unitario, quantidade, estoque_minimo, 
+          descricao, custo_unitario, preco_tabela, preco_sugerido, preco_minimo,
+          quantidade, estoque_minimo, estoque_fisico, ncm,
+          ultima_data_venda, ultima_data_compra,
           corredor, baia, nivel, locacao, criado_em, atualizado_em
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, NOW(), NOW())
         RETURNING *
       `, [
         newId,
@@ -1060,8 +1069,15 @@ apiRouter.post('/produtos', async (req: Request, res: Response) => {
         cleanBarcode,
         descricao.trim(),
         Number(custo_unitario) || 0,
+        Number(preco_tabela) || 0,
+        Number(preco_sugerido) || 0,
+        Number(preco_minimo) || 0,
         parseInt(quantidade, 10) || 0,
         parseInt(estoque_minimo, 10) || 0,
+        parseInt(estoque_fisico, 10) || 0,
+        ncm?.trim() || '',
+        ultima_data_venda?.trim() || '',
+        ultima_data_compra?.trim() || '',
         corredor.trim(),
         baia.trim(),
         nivel.trim(),
@@ -1499,6 +1515,10 @@ apiRouter.put('/produtos/:id', async (req: Request, res: Response) => {
     preco_minimo,
     quantidade,
     estoque_minimo,
+    estoque_fisico,
+    ncm,
+    ultima_data_venda,
+    ultima_data_compra,
     corredor,
     baia,
     nivel,
@@ -1580,12 +1600,16 @@ apiRouter.put('/produtos/:id', async (req: Request, res: Response) => {
           preco_minimo = $8,
           quantidade = $9,
           estoque_minimo = $10,
-          corredor = $11,
-          baia = $12,
-          nivel = $13,
-          locacao = $14,
+          estoque_fisico = $11,
+          ncm = $12,
+          ultima_data_venda = $13,
+          ultima_data_compra = $14,
+          corredor = $15,
+          baia = $16,
+          nivel = $17,
+          locacao = $18,
           atualizado_em = NOW()
-        WHERE id = $15
+        WHERE id = $19
         RETURNING *
       `, [
         descricao?.trim() || prev.descricao,
@@ -1598,6 +1622,10 @@ apiRouter.put('/produtos/:id', async (req: Request, res: Response) => {
         preco_minimo !== undefined ? Number(preco_minimo) : prev.preco_minimo,
         quantidade !== undefined ? parseInt(quantidade, 10) : prev.quantidade,
         estoque_minimo !== undefined ? parseInt(estoque_minimo, 10) : prev.estoque_minimo,
+        estoque_fisico !== undefined ? parseInt(estoque_fisico, 10) : prev.estoque_fisico,
+        ncm !== undefined ? String(ncm).trim() : prev.ncm,
+        ultima_data_venda !== undefined ? String(ultima_data_venda).trim() : prev.ultima_data_venda,
+        ultima_data_compra !== undefined ? String(ultima_data_compra).trim() : prev.ultima_data_compra,
         corredor?.trim() ?? prev.corredor,
         baia?.trim() ?? prev.baia,
         nivel?.trim() ?? prev.nivel,

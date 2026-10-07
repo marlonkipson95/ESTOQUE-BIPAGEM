@@ -62,6 +62,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const [nivel, setNivel] = useState(product.nivel || '');
   const [locacao, setLocacao] = useState(product.locacao || '');
 
+  // Novos Campos
+  const [estoqueFisico, setEstoqueFisico] = useState<number | string>(product.estoque_fisico ?? '');
+  const [ncm, setNcm] = useState(product.ncm || '');
+  const [ultimaDataVenda, setUltimaDataVenda] = useState(product.ultima_data_venda || '');
+  const [ultimaDataCompra, setUltimaDataCompra] = useState(product.ultima_data_compra || '');
+
   // New Code Replacement state
   const [showReplaceCodeModal, setShowReplaceCodeModal] = useState(false);
   const [newCodeType, setNewCodeType] = useState<CodeType>('codigo_barras');
@@ -126,7 +132,11 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       preco_sugerido: Number(precoSugerido) || 0,
       preco_minimo: Number(precoMinimo) || 0,
       quantidade: Number(quantidade) || 0,
-      estoqueMinimo: Number(estoqueMinimo) || 5,
+      estoque_minimo: Number(estoqueMinimo) || 5,
+      estoque_fisico: Number(estoqueFisico) || 0,
+      ncm: ncm.trim(),
+      ultima_data_venda: ultimaDataVenda.trim(),
+      ultima_data_compra: ultimaDataCompra.trim(),
       corredor: corredor.trim(),
       baia: baia.trim(),
       nivel: nivel.trim(),
@@ -474,11 +484,64 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     </div>
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-3">
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-xs">
+                        Estoque Contábil
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={quantidade}
+                        onChange={e => setQuantidade(parseInt(e.target.value) || 0)}
+                        className="w-full rounded-lg border border-slate-300 p-2.5 font-mono font-bold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-center"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-xs">
+                        Estoque Físico
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={estoqueFisico}
+                        onChange={e => setEstoqueFisico(parseInt(e.target.value) || 0)}
+                        className="w-full rounded-lg border border-indigo-300 p-2.5 font-mono text-indigo-900 bg-indigo-50/50 dark:border-indigo-700 dark:bg-indigo-950/20 dark:text-indigo-100 text-center"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-xs">
+                        Diferença
+                      </label>
+                      <div className={`w-full rounded-lg border p-2.5 font-mono font-black text-center ${
+                        Number(estoqueFisico) - quantidade === 0 
+                          ? 'border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-800/50 dark:bg-emerald-950/30 dark:text-emerald-400'
+                          : Number(estoqueFisico) - quantidade > 0 
+                            ? 'border-blue-300 bg-blue-50 text-blue-700 dark:border-blue-800/50 dark:bg-blue-950/30 dark:text-blue-400' 
+                            : 'border-rose-300 bg-rose-50 text-rose-700 dark:border-rose-800/50 dark:bg-rose-950/30 dark:text-rose-400'
+                      }`}>
+                        {Number(estoqueFisico) - quantidade > 0 ? '+' : ''}{Number(estoqueFisico) - quantidade}
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                        Estoque Atual
+                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-[11px]">
+                        NCM
+                      </label>
+                      <input
+                        type="text"
+                        value={ncm}
+                        onChange={e => setNcm(e.target.value)}
+                        placeholder="Ex: 8544.42.00"
+                        className="w-full rounded-lg border border-slate-300 p-2 font-mono text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-[11px]">
+                        Est. Mínimo
                       </label>
                       <input
                         type="number"
@@ -497,7 +560,32 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                         min="0"
                         value={estoqueMinimo}
                         onChange={e => setEstoqueMinimo(parseInt(e.target.value) || 0)}
-                        className="w-full rounded-lg border border-slate-300 p-2.5 font-mono text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-center"
+                        className="w-full rounded-lg border border-slate-300 p-2 font-mono text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-center"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-[10px] uppercase">
+                        Última Compra
+                      </label>
+                      <input
+                        type="date"
+                        value={ultimaDataCompra}
+                        onChange={e => setUltimaDataCompra(e.target.value)}
+                        className="w-full rounded-lg border border-slate-300 p-1.5 text-xs font-mono text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-[10px] uppercase">
+                        Última Venda
+                      </label>
+                      <input
+                        type="date"
+                        value={ultimaDataVenda}
+                        onChange={e => setUltimaDataVenda(e.target.value)}
+                        className="w-full rounded-lg border border-slate-300 p-1.5 text-xs font-mono text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                       />
                     </div>
                   </div>
