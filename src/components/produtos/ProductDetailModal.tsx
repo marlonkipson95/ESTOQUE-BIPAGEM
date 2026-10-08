@@ -191,6 +191,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
       nivel: nivel.trim(),
       locacao: locacao.trim() || (corredor || baia || nivel ? `${corredor}-${baia}-${nivel}`.replace(/^-|-$/g, '') : ''),
       atualizado_em: new Date().toISOString(),
+      usuario: user?.username || 'Operador Almoxarifado',
     };
 
     const updated = storageService.updateProduct(productPayload);
