@@ -120,10 +120,11 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
 
       const novoItem: QuickListItem = {
         id: 'item_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-        codigo: clean,
-        locacao: locacao,
-        comentario: '',
-        cadastrado: cadastrado,
+          codigo: clean,
+          descricao: itemInfoLookup?.descricao,
+          locacao: locacao,
+          comentario: '',
+          cadastrado: cadastrado,
         criado_em: new Date().toISOString()
       };
 
@@ -214,9 +215,10 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
     const novoItem: QuickListItem = {
       id: 'item_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
       codigo: cleanCod,
-      locacao: itemLocacao.trim(),
-      comentario: itemComentario.trim(),
-      cadastrado: itemInfoLookup?.found ?? false,
+        descricao: itemInfoLookup?.descricao,
+        locacao: itemLocacao.trim(),
+        comentario: itemComentario.trim(),
+        cadastrado: itemInfoLookup?.found ?? false,
       criado_em: new Date().toISOString()
     };
 
@@ -579,7 +581,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                   value={itemCodigo}
                   onChange={handleCodigoChange}
                   placeholder="Bipar ou digitar..."
-                  className="w-full rounded-xl bg-slate-800/90 border border-slate-700 px-3 py-2.5 text-sm text-white font-mono placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 pr-10"
+                  className="w-full rounded-xl bg-slate-800/90 border border-slate-700 px-3 py-2.5 text-sm text-white font-mono placeholder-slate-400 font-bold text-slate-100 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 pr-10"
                 />
                 <button
                   type="button"
@@ -618,7 +620,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                 value={itemLocacao}
                 onChange={e => setItemLocacao(e.target.value)}
                 placeholder="Ex: I-032-3 ou Corredor A"
-                className="w-full rounded-xl bg-slate-800/90 border border-slate-700 px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="w-full rounded-xl bg-slate-800/90 border border-slate-700 px-3 py-2.5 text-sm text-white placeholder-slate-400 font-bold text-slate-100 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
             </div>
 
@@ -632,7 +634,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                 value={itemComentario}
                 onChange={e => setItemComentario(e.target.value)}
                 placeholder="Ex: caixa danificada, 3 un..."
-                className="w-full rounded-xl bg-slate-800/90 border border-slate-700 px-3 py-2.5 text-sm text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="w-full rounded-xl bg-slate-800/90 border border-slate-700 px-3 py-2.5 text-sm text-white placeholder-slate-400 font-bold text-slate-100 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
             </div>
 
@@ -767,6 +769,9 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                         <span className="font-mono text-sm font-bold text-white tracking-wide">
                           {item.codigo}
                         </span>
+                        {item.descricao && (
+                          <div className="w-full text-xs text-slate-400 mt-0.5">{item.descricao}</div>
+                        )}
                         {item.cadastrado ? (
                           <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded whitespace-nowrap">
                             <Check className="h-3 w-3" /> No Sistema
@@ -824,6 +829,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                   <tr>
                     <th className="px-4 py-3 w-12 text-center whitespace-nowrap">#</th>
                     <th className="px-4 py-3 whitespace-nowrap">Código</th>
+                      <th className="px-4 py-3">Descrição</th>
                     <th className="px-4 py-3 whitespace-nowrap">Locação</th>
                     <th className="px-4 py-3 min-w-[200px]">Comentário / Observação</th>
                     <th className="px-4 py-3 text-center whitespace-nowrap">Status</th>
@@ -902,6 +908,9 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                         </td>
                         <td className="px-4 py-3 font-mono font-bold text-white whitespace-nowrap">
                           {item.codigo}
+                        </td>
+                        <td className="px-4 py-3 text-slate-300 text-xs">
+                          {item.descricao || <span className="text-slate-500 italic">Nenhuma</span>}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           {item.locacao ? (

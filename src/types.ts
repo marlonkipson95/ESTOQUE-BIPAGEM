@@ -213,6 +213,7 @@ export type AppModule =
 export interface QuickListItem {
   id: string;
   codigo: string;
+  descricao?: string;
   locacao?: string;
   comentario?: string;
   cadastrado?: boolean;

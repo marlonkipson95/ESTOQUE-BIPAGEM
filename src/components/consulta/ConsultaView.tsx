@@ -612,17 +612,28 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
                           </strong>
                         </div>
 
-                        <span
-                          className={`rounded-full px-2.5 py-1 text-xs font-black tracking-wide uppercase shrink-0 ${
-                            isOutOfStock
-                              ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300'
-                              : isLowStock
-                              ? 'bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-300'
-                              : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300'
-                          }`}
-                        >
-                          {isOutOfStock ? 'Sem estoque' : `${product.quantidade} un`}
-                        </span>
+                        <div className="flex flex-col items-end gap-1">
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-black tracking-wide uppercase shrink-0 ${
+                              isOutOfStock
+                                ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300'
+                                : isLowStock
+                                ? 'bg-orange-100 text-orange-800 dark:bg-orange-950/50 dark:text-orange-300'
+                                : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300'
+                            }`}
+                          >
+                            Contábil: {product.quantidade} un
+                          </span>
+                          <span
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-black tracking-wide uppercase shrink-0 ${
+                              (product.estoque_fisico || 0) <= 0
+                                ? 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'
+                                : 'bg-indigo-100 text-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-300'
+                            }`}
+                          >
+                            Físico: {product.estoque_fisico || 0} un
+                          </span>
+                        </div>
                       </div>
 
                       {/* EAN do produto com atalho para desvincular */}
