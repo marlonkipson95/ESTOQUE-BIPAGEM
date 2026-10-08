@@ -1791,6 +1791,96 @@ apiRouter.patch('/produtos/:id/estoque', async (req: Request, res: Response) => 
 });
 
 // ==========================================
+// 9b-1. GET /api/produtos/:id/historico
+// ==========================================
+apiRouter.get('/produtos/:id/historico', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  const pool = getDbPool();
+  
+  if (!pool) return res.json([]);
+  
+  try {
+    const client = await pool.connect();
+    try {
+      const { rows } = await client.query(`
+        SELECT * FROM historico_alteracoes 
+        WHERE produto_id = $1 
+        ORDER BY criado_em DESC
+      `, [id]);
+      return res.json(rows);
+    } finally {
+      client.release();
+    }
+  } catch (err: any) {
+    console.error('Erro ao buscar historico:', err.message);
+    return res.status(500).json({ error: 'Falha ao buscar historico' });
+  }
+});
+
+// ==========================================
+// 9b-2. POST /api/produtos/:id/rollback/:historicoId
+// ==========================================
+apiRouter.post('/produtos/:id/rollback/:historicoId', async (req: Request, res: Response) => {
+  const { id, historicoId } = req.params;
+  const { usuario } = req.body;
+  const pool = getDbPool();
+  
+  if (!pool) return res.status(500).json({ error: 'DB não configurado' });
+
+  try {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // Pega o registro do histórico
+      const hist = await client.query('SELECT * FROM historico_alteracoes WHERE id = $1 AND produto_id = $2', [historicoId, id]);
+      
+      if (hist.rows.length === 0) {
+        await client.query('ROLLBACK');
+        return res.status(404).json({ error: 'Registro de histórico não encontrado' });
+      }
+
+      const rec = hist.rows[0];
+      const validFields = ['descricao', 'codigo_atual', 'codigo_fabrica', 'codigo_barras_atual', 'custo_unitario', 'preco_tabela', 'preco_sugerido', 'preco_minimo', 'quantidade', 'estoque_minimo', 'estoque_fisico', 'ncm', 'locacao'];
+      
+      if (!validFields.includes(rec.campo)) {
+        await client.query('ROLLBACK');
+        return res.status(400).json({ error: 'Campo não permitido para rollback automático' });
+      }
+
+      // Reverter o valor
+      let finalValue: any = rec.valor_anterior;
+      
+      // Ajustes de tipo baseado no campo
+      if (['custo_unitario', 'preco_tabela', 'preco_sugerido', 'preco_minimo'].includes(rec.campo)) {
+        finalValue = finalValue ? Number(finalValue) : null;
+      } else if (['quantidade', 'estoque_minimo', 'estoque_fisico'].includes(rec.campo)) {
+        finalValue = finalValue ? parseInt(finalValue, 10) : 0;
+      }
+
+      await client.query(`UPDATE produtos SET ${rec.campo} = $1, atualizado_em = NOW() WHERE id = $2`, [finalValue, id]);
+
+      // Gera novo registro de histórico
+      await client.query(`
+        INSERT INTO historico_alteracoes (produto_id, campo, valor_anterior, valor_novo, motivo, usuario)
+        VALUES ($1, $2, $3, $4, $5, $6)
+      `, [id, rec.campo, rec.valor_novo, rec.valor_anterior, 'Rollback / Desfazer Ação', usuario || 'Operador Almoxarifado']);
+
+      await client.query('COMMIT');
+      return res.json({ success: true, message: 'Alteração desfeita com sucesso!' });
+    } catch (err: any) {
+      await client.query('ROLLBACK');
+      console.error('Erro no rollback:', err.message);
+      return res.status(500).json({ error: err.message });
+    } finally {
+      client.release();
+    }
+  } catch (err: any) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
 // 9c. DELETE /api/produtos/:id (Exclusão Real com Integridade Referencial)
 // ==========================================
 apiRouter.delete('/produtos/:id', async (req: Request, res: Response) => {
@@ -2574,6 +2664,11 @@ interface MemoryUser {
   ativo: boolean;
   criado_em: string;
   ultimo_login?: string;
+  perm_consultas?: boolean;
+  perm_alterar_basico?: boolean;
+  perm_alterar_preco?: boolean;
+  perm_alterar_locacao?: boolean;
+  perm_alterar_desc?: boolean;
 }
 
 const memoryUsers: MemoryUser[] = [
@@ -2656,6 +2751,11 @@ apiRouter.post('/auth/login', async (req: Request, res: Response) => {
         ativo: memUser.ativo,
         criado_em: memUser.criado_em,
         ultimo_login: memUser.ultimo_login,
+        perm_consultas: memUser.perm_consultas,
+        perm_alterar_basico: memUser.perm_alterar_basico,
+        perm_alterar_preco: memUser.perm_alterar_preco,
+        perm_alterar_locacao: memUser.perm_alterar_locacao,
+        perm_alterar_desc: memUser.perm_alterar_desc,
       },
     });
   }
@@ -2673,7 +2773,7 @@ apiRouter.get('/usuarios', async (req: Request, res: Response) => {
       const client = await pool.connect();
       try {
         const result = await client.query(
-          'SELECT id, username, nome, cargo, ativo, criado_em, ultimo_login FROM usuarios ORDER BY id ASC'
+          'SELECT id, username, nome, cargo, ativo, criado_em, ultimo_login, perm_consultas, perm_alterar_basico, perm_alterar_preco, perm_alterar_locacao, perm_alterar_desc FROM usuarios ORDER BY id ASC'
         );
         return res.json({ users: result.rows });
       } finally {
@@ -2691,7 +2791,7 @@ apiRouter.get('/usuarios', async (req: Request, res: Response) => {
 
 // POST /api/usuarios (Cadastrar novo usuário)
 apiRouter.post('/usuarios', async (req: Request, res: Response) => {
-  const { username, password, nome, cargo = 'Operador Almoxarifado' } = req.body;
+  const { username, password, nome, cargo = 'Operador Almoxarifado', perm_consultas, perm_alterar_basico, perm_alterar_preco, perm_alterar_locacao, perm_alterar_desc } = req.body;
 
   if (!username || !password || !nome) {
     return res.status(400).json({ error: 'Nome, usuário e senha são obrigatórios.' });
@@ -2713,10 +2813,11 @@ apiRouter.post('/usuarios', async (req: Request, res: Response) => {
         }
 
         const insert = await client.query(
-          `INSERT INTO usuarios (username, password, nome, cargo, ativo, criado_em)
-           VALUES ($1, $2, $3, $4, true, NOW())
-           RETURNING id, username, nome, cargo, ativo, criado_em`,
-          [cleanUser, cleanPass, cleanNome, cleanCargo]
+          `INSERT INTO usuarios (username, password, nome, cargo, ativo, criado_em, perm_consultas, perm_alterar_basico, perm_alterar_preco, perm_alterar_locacao, perm_alterar_desc)
+           VALUES ($1, $2, $3, $4, true, NOW(), $5, $6, $7, $8, $9)
+           RETURNING id, username, nome, cargo, ativo, criado_em, perm_consultas, perm_alterar_basico, perm_alterar_preco, perm_alterar_locacao, perm_alterar_desc`,
+          [cleanUser, cleanPass, cleanNome, cleanCargo, 
+           perm_consultas ?? true, perm_alterar_basico ?? true, perm_alterar_preco ?? true, perm_alterar_locacao ?? true, perm_alterar_desc ?? true]
         );
 
         return res.status(201).json({ user: insert.rows[0] });
@@ -2753,7 +2854,7 @@ apiRouter.post('/usuarios', async (req: Request, res: Response) => {
 // PUT /api/usuarios/:id (Atualizar usuário/senha)
 apiRouter.put('/usuarios/:id', async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { nome, password, cargo, ativo } = req.body;
+  const { nome, password, cargo, ativo, perm_consultas, perm_alterar_basico, perm_alterar_preco, perm_alterar_locacao, perm_alterar_desc } = req.body;
 
   const pool = getDbPool();
   if (pool) {
@@ -2781,6 +2882,27 @@ apiRouter.put('/usuarios/:id', async (req: Request, res: Response) => {
           values.push(Boolean(ativo));
         }
 
+        if (perm_consultas !== undefined) {
+          sets.push(`perm_consultas = $${idx++}`);
+          values.push(Boolean(perm_consultas));
+        }
+        if (perm_alterar_basico !== undefined) {
+          sets.push(`perm_alterar_basico = $${idx++}`);
+          values.push(Boolean(perm_alterar_basico));
+        }
+        if (perm_alterar_preco !== undefined) {
+          sets.push(`perm_alterar_preco = $${idx++}`);
+          values.push(Boolean(perm_alterar_preco));
+        }
+        if (perm_alterar_locacao !== undefined) {
+          sets.push(`perm_alterar_locacao = $${idx++}`);
+          values.push(Boolean(perm_alterar_locacao));
+        }
+        if (perm_alterar_desc !== undefined) {
+          sets.push(`perm_alterar_desc = $${idx++}`);
+          values.push(Boolean(perm_alterar_desc));
+        }
+
         if (sets.length === 0) {
           return res.status(400).json({ error: 'Nenhum dado informado para atualização.' });
         }
@@ -2790,7 +2912,7 @@ apiRouter.put('/usuarios/:id', async (req: Request, res: Response) => {
           UPDATE usuarios 
           SET ${sets.join(', ')} 
           WHERE id = $${idx}
-          RETURNING id, username, nome, cargo, ativo, criado_em, ultimo_login
+          RETURNING id, username, nome, cargo, ativo, criado_em, ultimo_login, perm_consultas, perm_alterar_basico, perm_alterar_preco, perm_alterar_locacao, perm_alterar_desc
         `;
 
         const result = await client.query(query, values);

@@ -47,6 +47,11 @@ export const UsuariosView: React.FC = () => {
     password: '',
     cargo: 'Operador Almoxarifado',
     ativo: true,
+    perm_consultas: true,
+    perm_alterar_basico: true,
+    perm_alterar_preco: true,
+    perm_alterar_locacao: true,
+    perm_alterar_desc: true,
   });
 
   const loadUsers = async () => {
@@ -80,6 +85,11 @@ export const UsuariosView: React.FC = () => {
         username: formData.username.trim().toLowerCase(),
         password: formData.password.trim(),
         cargo: formData.cargo.trim(),
+        perm_consultas: formData.perm_consultas,
+        perm_alterar_basico: formData.perm_alterar_basico,
+        perm_alterar_preco: formData.perm_alterar_preco,
+        perm_alterar_locacao: formData.perm_alterar_locacao,
+        perm_alterar_desc: formData.perm_alterar_desc,
       });
 
       if (res.success) {
@@ -92,6 +102,11 @@ export const UsuariosView: React.FC = () => {
           password: '',
           cargo: 'Operador Almoxarifado',
           ativo: true,
+          perm_consultas: true,
+          perm_alterar_basico: true,
+          perm_alterar_preco: true,
+          perm_alterar_locacao: true,
+          perm_alterar_desc: true,
         });
         loadUsers();
         setTimeout(() => setSuccessMsg(null), 4000);
@@ -114,6 +129,11 @@ export const UsuariosView: React.FC = () => {
         nome: formData.nome.trim(),
         cargo: formData.cargo.trim(),
         ativo: formData.ativo,
+        perm_consultas: formData.perm_consultas,
+        perm_alterar_basico: formData.perm_alterar_basico,
+        perm_alterar_preco: formData.perm_alterar_preco,
+        perm_alterar_locacao: formData.perm_alterar_locacao,
+        perm_alterar_desc: formData.perm_alterar_desc,
         ...(formData.password.trim() ? { password: formData.password.trim() } : {}),
       });
 
@@ -500,6 +520,34 @@ export const UsuariosView: React.FC = () => {
                 <label htmlFor="user-ativo" className="text-xs font-semibold text-slate-700 dark:text-slate-300">
                   Usuário Ativo (pode acessar o sistema)
                 </label>
+              </div>
+
+              <div className="pt-2">
+                <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-2 border-b border-slate-200 dark:border-slate-800 pb-1">
+                  Permissões de Acesso
+                </label>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={formData.perm_consultas} onChange={e => setFormData({ ...formData, perm_consultas: e.target.checked })} className="rounded border-slate-300" />
+                    <span>Consultas (Bipagem)</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={formData.perm_alterar_basico} onChange={e => setFormData({ ...formData, perm_alterar_basico: e.target.checked })} className="rounded border-slate-300" />
+                    <span>Alterar Info. Básica</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={formData.perm_alterar_preco} onChange={e => setFormData({ ...formData, perm_alterar_preco: e.target.checked })} className="rounded border-slate-300" />
+                    <span>Alterar Preço/Custo</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={formData.perm_alterar_locacao} onChange={e => setFormData({ ...formData, perm_alterar_locacao: e.target.checked })} className="rounded border-slate-300" />
+                    <span>Alterar Locação</span>
+                  </label>
+                  <label className="flex items-center gap-1.5 cursor-pointer">
+                    <input type="checkbox" checked={formData.perm_alterar_desc} onChange={e => setFormData({ ...formData, perm_alterar_desc: e.target.checked })} className="rounded border-slate-300" />
+                    <span>Alterar Descrição</span>
+                  </label>
+                </div>
               </div>
 
               <div className="pt-3 flex justify-end gap-2 border-t border-slate-200 dark:border-slate-800">

@@ -175,6 +175,11 @@ export interface SystemUser {
   ativo: boolean;
   criado_em?: string;
   ultimo_login?: string;
+  perm_consultas?: boolean;
+  perm_alterar_basico?: boolean;
+  perm_alterar_preco?: boolean;
+  perm_alterar_locacao?: boolean;
+  perm_alterar_desc?: boolean;
 }
 
 export interface AuthSession {

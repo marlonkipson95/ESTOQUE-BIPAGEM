@@ -39,7 +39,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   onProductDeleted,
 }) => {
   const [currentProduct, setCurrentProduct] = useState<Product>(product);
-  const [activeTab, setActiveTab] = useState<'info' | 'location' | 'history' | 'relacionados'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'location' | 'history' | 'relacionados' | 'audit'>('info');
 
   // Form states for basic info & location
   const [descricao, setDescricao] = useState(product.descricao);
@@ -88,6 +88,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   // Feedback notifications
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
+  // Audit state
+  const [auditLog, setAuditLog] = useState<any[]>([]);
+  const [isLoadingAudit, setIsLoadingAudit] = useState(false);
+
   // Retrieve full code history for this product
   const historyList = storageService.getProductHistory(product.id);
 
@@ -110,8 +114,46 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   useEffect(() => {
     if (activeTab === 'relacionados') {
       loadRelated();
+    } else if (activeTab === 'audit') {
+      loadAudit();
     }
   }, [activeTab]);
+
+  const loadAudit = async () => {
+    setIsLoadingAudit(true);
+    try {
+      const res = await fetch(`/api/produtos/${currentProduct.id}/historico`);
+      if (res.ok) {
+        const data = await res.json();
+        setAuditLog(data);
+      }
+    } catch (err) {
+      console.error('Falha ao buscar auditoria:', err);
+    } finally {
+      setIsLoadingAudit(false);
+    }
+  };
+
+  const handleRollback = async (historicoId: number) => {
+    if (!window.confirm('Tem certeza que deseja desfazer essa alteração?')) return;
+    try {
+      const res = await fetch(`/api/produtos/${currentProduct.id}/rollback/${historicoId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usuario: 'Operador Almoxarifado' })
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setFeedbackMsg({ type: 'success', text: 'Alteração desfeita com sucesso!' });
+        loadAudit(); // reload audit log
+        setTimeout(() => window.location.reload(), 1500); // Reload page to reflect changes easily
+      } else {
+        setFeedbackMsg({ type: 'error', text: data.error || 'Erro ao desfazer' });
+      }
+    } catch (err) {
+      setFeedbackMsg({ type: 'error', text: 'Erro de conexão' });
+    }
+  };
 
   // Save basic info and location (never changing ID!)
   const handleSaveDetails = (e: React.FormEvent) => {
@@ -383,6 +425,17 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
           >
             <Layers className="h-3.5 w-3.5" />
             <span>Produtos Relacionados ({relatedList.length})</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('audit')}
+            className={`border-b-2 py-3 px-3 transition flex items-center gap-1.5 whitespace-nowrap ${
+              activeTab === 'audit'
+                ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400 font-bold'
+                : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            <Clock className="h-3.5 w-3.5" />
+            <span>Auditoria & Desfazer</span>
           </button>
         </div>
 
@@ -1025,6 +1078,64 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       </div>
                     );
                   })
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 5: AUDITORIA / DESFAZER */}
+          {activeTab === 'audit' && (
+            <div className="space-y-4 text-xs">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                    <Clock className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                    Histórico de Alterações e Restauração
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-1 max-w-lg">
+                    Rastreie todas as edições neste item. Você pode desfazer a última alteração com um clique para voltar os valores originais de estoque, preço e localização.
+                  </p>
+                </div>
+              </div>
+
+              <div className="divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white dark:divide-slate-800 dark:border-slate-800 dark:bg-slate-900 overflow-hidden">
+                {isLoadingAudit ? (
+                  <div className="p-4 text-center text-slate-400">Carregando auditoria...</div>
+                ) : auditLog.length === 0 ? (
+                  <div className="p-4 text-center text-slate-400">Nenhuma alteração registrada.</div>
+                ) : (
+                  auditLog.map(item => (
+                    <div key={item.id} className="p-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 flex items-center justify-between gap-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-bold text-slate-900 dark:text-white uppercase">Campo: {item.campo}</span>
+                          <span className="text-[10px] text-slate-500">{new Date(item.criado_em).toLocaleString('pt-BR')}</span>
+                        </div>
+                        <div className="flex items-center gap-4 text-[11px]">
+                          <div className="flex flex-col">
+                            <span className="text-slate-500">Valor Anterior</span>
+                            <span className="font-mono text-rose-600 font-medium truncate max-w-[150px]">{String(item.valor_anterior || 'Vazio')}</span>
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-slate-500">Valor Novo</span>
+                            <span className="font-mono text-emerald-600 font-medium truncate max-w-[150px]">{String(item.valor_novo || 'Vazio')}</span>
+                          </div>
+                          <div className="flex flex-col border-l border-slate-200 dark:border-slate-700 pl-4 ml-2">
+                            <span className="text-slate-500">Operador / Motivo</span>
+                            <span className="font-medium text-slate-700 dark:text-slate-300">{item.usuario || 'Sistema'} / {item.motivo}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleRollback(item.id)}
+                        title="Desfazer e retornar para Valor Anterior"
+                        className="rounded-lg bg-slate-100 dark:bg-slate-800 p-2 text-slate-600 dark:text-slate-400 hover:bg-rose-100 hover:text-rose-600 dark:hover:bg-rose-900/30 dark:hover:text-rose-400 transition"
+                      >
+                        <History className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))
                 )}
               </div>
             </div>

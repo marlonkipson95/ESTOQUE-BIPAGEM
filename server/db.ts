@@ -210,8 +210,23 @@ export async function initDatabaseSchema(): Promise<void> {
         cargo VARCHAR(60) DEFAULT 'Operador Almoxarifado',
         ativo BOOLEAN DEFAULT TRUE,
         criado_em TIMESTAMPTZ DEFAULT NOW(),
-        ultimo_login TIMESTAMPTZ
+        ultimo_login TIMESTAMPTZ,
+        perm_consultas BOOLEAN DEFAULT TRUE,
+        perm_alterar_basico BOOLEAN DEFAULT TRUE,
+        perm_alterar_preco BOOLEAN DEFAULT TRUE,
+        perm_alterar_locacao BOOLEAN DEFAULT TRUE,
+        perm_alterar_desc BOOLEAN DEFAULT TRUE
       );
+    `);
+    
+    // Adicionar colunas caso a tabela já exista
+    await client.query(`
+      ALTER TABLE usuarios 
+      ADD COLUMN IF NOT EXISTS perm_consultas BOOLEAN DEFAULT TRUE,
+      ADD COLUMN IF NOT EXISTS perm_alterar_basico BOOLEAN DEFAULT TRUE,
+      ADD COLUMN IF NOT EXISTS perm_alterar_preco BOOLEAN DEFAULT TRUE,
+      ADD COLUMN IF NOT EXISTS perm_alterar_locacao BOOLEAN DEFAULT TRUE,
+      ADD COLUMN IF NOT EXISTS perm_alterar_desc BOOLEAN DEFAULT TRUE;
     `);
 
     // Inserir usuário padrão solicitado (estoque / controle12) se não existir

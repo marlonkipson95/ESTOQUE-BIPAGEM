@@ -166,6 +166,11 @@ class AuthService {
     password?: string;
     nome: string;
     cargo: string;
+    perm_consultas?: boolean;
+    perm_alterar_basico?: boolean;
+    perm_alterar_preco?: boolean;
+    perm_alterar_locacao?: boolean;
+    perm_alterar_desc?: boolean;
   }): Promise<{ success: boolean; user?: SystemUser; error?: string }> {
     try {
       const res = await fetch('/api/usuarios', {
@@ -195,6 +200,11 @@ class AuthService {
         nome: user.nome.trim(),
         cargo: user.cargo.trim(),
         ativo: true,
+        perm_consultas: user.perm_consultas ?? true,
+        perm_alterar_basico: user.perm_alterar_basico ?? true,
+        perm_alterar_preco: user.perm_alterar_preco ?? true,
+        perm_alterar_locacao: user.perm_alterar_locacao ?? true,
+        perm_alterar_desc: user.perm_alterar_desc ?? true,
         criado_em: new Date().toISOString(),
       };
 
@@ -206,7 +216,17 @@ class AuthService {
 
   async updateUser(
     id: number | string,
-    data: { nome?: string; cargo?: string; password?: string; ativo?: boolean }
+    data: { 
+      nome?: string; 
+      cargo?: string; 
+      password?: string; 
+      ativo?: boolean;
+      perm_consultas?: boolean;
+      perm_alterar_basico?: boolean;
+      perm_alterar_preco?: boolean;
+      perm_alterar_locacao?: boolean;
+      perm_alterar_desc?: boolean;
+    }
   ): Promise<{ success: boolean; user?: SystemUser; error?: string }> {
     try {
       const res = await fetch(`/api/usuarios/${id}`, {
