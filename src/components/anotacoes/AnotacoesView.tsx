@@ -392,13 +392,13 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
     return (
       <div className="space-y-6">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800 pb-5">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-200 dark:border-slate-800 pb-5">
           <div>
             <div className="flex items-center gap-2">
               <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">
                 <ClipboardList className="h-5 w-5" />
               </span>
-              <h2 className="text-xl font-bold tracking-tight text-white">
+              <h2 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white">
                 Anotações e Listas Rápidas
               </h2>
             </div>
@@ -411,7 +411,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
             <button
               onClick={carregarListas}
               disabled={loading}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 bg-slate-800/80 border border-slate-700/80 hover:bg-slate-700 transition"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700/80 hover:bg-slate-700 transition"
               title="Recarregar Listas"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -434,7 +434,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
             Carregando listas rápidas do banco de dados...
           </div>
         ) : listas.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-800 bg-slate-900/40 p-12 text-center">
+          <div className="rounded-2xl border border-dashed border-slate-200 dark:border-slate-800 bg-slate-900/40 p-12 text-center">
             <ClipboardList className="mx-auto h-12 w-12 text-slate-600 mb-3" />
             <h3 className="text-base font-semibold text-slate-200">Nenhuma lista rápida criada ainda</h3>
             <p className="mt-1 text-xs text-slate-400 max-w-sm mx-auto">
@@ -453,7 +453,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
             {listas.map(lista => (
               <div
                 key={lista.id}
-                className="group relative rounded-2xl bg-slate-900/80 border border-slate-800 p-5 shadow-sm hover:border-indigo-500/50 hover:bg-slate-800/40 transition flex flex-col justify-between"
+                className="group relative rounded-2xl bg-slate-900/80 border border-slate-200 dark:border-slate-800 p-5 shadow-sm hover:border-indigo-500/50 hover:bg-slate-800/40 transition flex flex-col justify-between"
               >
                 <div>
                   <div className="flex items-start justify-between gap-2">
@@ -466,7 +466,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                     </span>
                   </div>
 
-                  <h3 className="text-sm font-bold text-white mt-2.5 line-clamp-1 group-hover:text-indigo-300 transition">
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white mt-2.5 line-clamp-1 group-hover:text-indigo-300 transition">
                     {lista.nome}
                   </h3>
 
@@ -482,7 +482,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                   </div>
                 </div>
 
-                <div className="mt-5 pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                <div className="mt-5 pt-3 border-t border-slate-200 dark:border-slate-800/80 flex items-center justify-between gap-2">
                   <button
                     onClick={() => handleAbrirLista(lista)}
                     className="flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold text-indigo-300 bg-indigo-950/40 border border-indigo-800/40 hover:bg-indigo-600 hover:text-white transition text-center"
@@ -511,11 +511,11 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
   return (
     <div className="space-y-6 pb-32">
       {/* Top Action Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-800 pb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-4">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setViewState('list')}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            className="p-2 rounded-xl text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-slate-800 transition"
             title="Voltar para todas as listas"
           >
             <ChevronLeft className="h-5 w-5" />
@@ -530,7 +530,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                 value={currentLista.nome}
                 onChange={e => setCurrentLista(prev => ({ ...prev, nome: e.target.value }))}
                 placeholder="Nome da lista (ex: Contagem Setembro)"
-                className="text-base font-bold text-white bg-transparent border-b border-dashed border-slate-700 focus:border-indigo-500 focus:outline-none px-1 py-0.5"
+                className="text-base font-bold text-slate-900 dark:text-white bg-transparent border-b border-dashed border-slate-300 dark:border-slate-700 focus:border-indigo-500 focus:outline-none px-1 py-0.5"
               />
             </div>
           </div>
@@ -539,7 +539,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={handleImprimir}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-300 bg-slate-800 border border-slate-700 hover:bg-slate-700 transition"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-700 transition"
           >
             <Printer className="h-3.5 w-3.5" />
             Imprimir
@@ -595,7 +595,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
       )}
 
       {/* Formulário de Adição Rápida */}
-      <div className="rounded-2xl bg-slate-900 border border-slate-800 p-4 sm:p-5 shadow-md">
+      <div className="rounded-2xl bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 sm:p-5 shadow-md">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-indigo-500"></span>
@@ -622,7 +622,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                   value={itemCodigo}
                   onChange={handleCodigoChange}
                   placeholder="Bipar ou digitar..."
-                  className="w-full rounded-xl bg-slate-800/90 border border-slate-700 px-3 py-2.5 text-sm text-white font-mono placeholder-slate-400 font-bold text-slate-100 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 pr-10"
+                  className="w-full rounded-xl bg-slate-800/90 border border-slate-300 dark:border-slate-700 px-3 py-2.5 text-sm text-white font-mono placeholder-slate-500 dark:placeholder-slate-400 font-bold text-slate-100 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 pr-10"
                 />
                 <button
                   type="button"
@@ -661,7 +661,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                 value={itemLocacao}
                 onChange={e => setItemLocacao(e.target.value)}
                 placeholder="Ex: I-032-3 ou Corredor A"
-                className="w-full rounded-xl bg-slate-800/90 border border-slate-700 px-3 py-2.5 text-sm text-white placeholder-slate-400 font-bold text-slate-100 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="w-full rounded-xl bg-slate-800/90 border border-slate-300 dark:border-slate-700 px-3 py-2.5 text-sm text-white placeholder-slate-500 dark:placeholder-slate-400 font-bold text-slate-100 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
             </div>
 
@@ -675,7 +675,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                 value={itemComentario}
                 onChange={e => setItemComentario(e.target.value)}
                 placeholder="Ex: caixa danificada, 3 un..."
-                className="w-full rounded-xl bg-slate-800/90 border border-slate-700 px-3 py-2.5 text-sm text-white placeholder-slate-400 font-bold text-slate-100 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="w-full rounded-xl bg-slate-800/90 border border-slate-300 dark:border-slate-700 px-3 py-2.5 text-sm text-white placeholder-slate-500 dark:placeholder-slate-400 font-bold text-slate-100 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
             </div>
 
@@ -702,7 +702,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                 key={idx}
                 type="button"
                 onClick={() => setItemComentario(sugestao)}
-                className="text-[10px] px-2 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-700/80 hover:bg-indigo-950/60 hover:text-indigo-300 hover:border-indigo-700/50 transition"
+                className="text-[10px] px-2 py-1 rounded-lg bg-slate-800 text-slate-300 border border-slate-300 dark:border-slate-700/80 hover:bg-indigo-950/60 hover:text-indigo-300 hover:border-indigo-700/50 transition"
               >
                 {sugestao}
               </button>
@@ -712,10 +712,10 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
       </div>
 
       {/* Tabela de Itens da Lista */}
-      <div className="rounded-2xl bg-slate-900 border border-slate-800 overflow-hidden shadow-sm">
-        <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+      <div className="rounded-2xl bg-slate-900 border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+        <div className="px-5 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-300">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
               Itens Registrados
             </span>
             <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
@@ -740,7 +740,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
 
                 if (isEditing) {
                   return (
-                    <div key={item.id} className="p-4 space-y-3 bg-slate-800/80 border border-indigo-500/50 rounded-xl my-2">
+                    <div key={item.id} className="p-4 space-y-3 bg-white dark:bg-slate-800/80 border border-indigo-500/50 rounded-xl my-2">
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-indigo-300">
                           Editando Item #{currentLista.itens.length - idx}
@@ -771,7 +771,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                           type="text"
                           value={editItemValues.codigo}
                           onChange={e => setEditItemValues(prev => ({ ...prev, codigo: e.target.value }))}
-                          className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-1.5 text-xs text-white font-mono focus:border-indigo-500 focus:outline-none"
+                          className="w-full rounded-lg bg-slate-900 border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs text-white font-mono focus:border-indigo-500 focus:outline-none"
                         />
                       </div>
 
@@ -782,7 +782,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                           value={editItemValues.locacao}
                           onChange={e => setEditItemValues(prev => ({ ...prev, locacao: e.target.value }))}
                           placeholder="Ex: I-032-3 ou Corredor A"
-                          className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-1.5 text-xs text-white focus:border-indigo-500 focus:outline-none"
+                          className="w-full rounded-lg bg-slate-900 border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs text-white focus:border-indigo-500 focus:outline-none"
                         />
                       </div>
 
@@ -793,7 +793,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                           value={editItemValues.comentario}
                           onChange={e => setEditItemValues(prev => ({ ...prev, comentario: e.target.value }))}
                           placeholder="Ex: caixa danificada..."
-                          className="w-full rounded-lg bg-slate-900 border border-slate-700 px-3 py-1.5 text-xs text-white focus:border-indigo-500 focus:outline-none"
+                          className="w-full rounded-lg bg-slate-900 border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs text-white focus:border-indigo-500 focus:outline-none"
                         />
                       </div>
                     </div>
@@ -804,7 +804,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                   <div key={item.id} className="p-4 space-y-2.5 hover:bg-slate-800/30 transition">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700">
+                        <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-300 dark:border-slate-700">
                           #{currentLista.itens.length - idx}
                         </span>
                         <span className="font-mono text-sm font-bold text-white tracking-wide">
@@ -854,7 +854,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                     )}
 
                     {item.comentario && (
-                      <div className="bg-slate-800/50 rounded-lg px-2.5 py-1.5 border border-slate-700/50 text-xs text-slate-300 break-words">
+                      <div className="bg-slate-800/50 rounded-lg px-2.5 py-1.5 border border-slate-300 dark:border-slate-700/50 text-xs text-slate-300 break-words">
                         {item.comentario}
                       </div>
                     )}
@@ -866,7 +866,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
             {/* 2. TABELA COMPLETA PARA TABLET E DESKTOP (hidden sm:block) */}
             <div className="hidden sm:block overflow-x-auto">
               <table className="w-full text-left text-xs min-w-[620px]">
-                <thead className="bg-slate-800/60 text-slate-400 font-semibold border-b border-slate-800">
+                <thead className="bg-slate-800/60 text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800">
                   <tr>
                     <th className="px-4 py-3 w-12 text-center whitespace-nowrap">#</th>
                     <th className="px-4 py-3 whitespace-nowrap">Código</th>
@@ -901,7 +901,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                               value={editItemValues.locacao}
                               onChange={e => setEditItemValues(prev => ({ ...prev, locacao: e.target.value }))}
                               placeholder="Locação..."
-                              className="w-full rounded-lg bg-slate-900 border border-slate-700 px-2 py-1 text-xs text-white focus:border-indigo-500 focus:outline-none"
+                              className="w-full rounded-lg bg-slate-900 border border-slate-300 dark:border-slate-700 px-2 py-1 text-xs text-white focus:border-indigo-500 focus:outline-none"
                             />
                           </td>
                           <td className="px-4 py-2">
@@ -910,7 +910,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                               value={editItemValues.comentario}
                               onChange={e => setEditItemValues(prev => ({ ...prev, comentario: e.target.value }))}
                               placeholder="Observação..."
-                              className="w-full rounded-lg bg-slate-900 border border-slate-700 px-2 py-1 text-xs text-white focus:border-indigo-500 focus:outline-none"
+                              className="w-full rounded-lg bg-slate-900 border border-slate-300 dark:border-slate-700 px-2 py-1 text-xs text-white focus:border-indigo-500 focus:outline-none"
                             />
                           </td>
                           <td className="px-4 py-3 text-center whitespace-nowrap">
@@ -955,7 +955,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           {item.locacao ? (
-                            <span className="inline-flex items-center gap-1 font-mono font-bold text-xs text-slate-200 bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-700 whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1 font-mono font-bold text-xs text-slate-200 bg-slate-800 px-2.5 py-1 rounded-lg border border-slate-300 dark:border-slate-700 whitespace-nowrap">
                               <MapPin className="h-3 w-3 text-indigo-400" />
                               {item.locacao}
                             </span>
