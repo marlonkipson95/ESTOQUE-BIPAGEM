@@ -2454,8 +2454,10 @@ apiRouter.post('/importar', async (req: Request, res: Response) => {
               baia = $7,
               nivel = $8,
               locacao = $9,
+              ultima_data_venda = COALESCE(NULLIF($10, ''), ultima_data_venda),
+              ultima_data_compra = COALESCE(NULLIF($11, ''), ultima_data_compra),
               atualizado_em = NOW()
-            WHERE id = $10
+            WHERE id = $12
           `, [
             item.descricao.trim(),
             codFabrica,
@@ -2466,6 +2468,8 @@ apiRouter.post('/importar', async (req: Request, res: Response) => {
             finalBaia,
             finalNivel,
             finalLoc,
+            item.ultima_data_venda?.trim() || '',
+            item.ultima_data_compra?.trim() || '',
             existingId,
           ]);
 
@@ -2482,9 +2486,9 @@ apiRouter.post('/importar', async (req: Request, res: Response) => {
             INSERT INTO produtos (
               id, codigo_atual, codigo_fabrica, codigo_barras_atual,
               descricao, custo_unitario, quantidade, estoque_minimo,
-              corredor, baia, nivel, locacao, criado_em, atualizado_em
+              corredor, baia, nivel, locacao, ultima_data_venda, ultima_data_compra, criado_em, atualizado_em
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW(), NOW())
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())
           `, [
             newId,
             finalCode,
@@ -2498,6 +2502,8 @@ apiRouter.post('/importar', async (req: Request, res: Response) => {
             item.baia || '',
             item.nivel || '',
             finalLoc,
+            item.ultima_data_venda?.trim() || '',
+            item.ultima_data_compra?.trim() || '',
           ]);
 
           if (barcode) {

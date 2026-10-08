@@ -146,6 +146,7 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
     const termNormWithoutE = termNorm.endsWith('E') ? termNorm.slice(0, -1) : termNorm;
 
     return allProducts.filter(product => {
+      if (!product) return false;
       // 1. Omni-Search matching:
       // - código interno atual
       // - código fábrica

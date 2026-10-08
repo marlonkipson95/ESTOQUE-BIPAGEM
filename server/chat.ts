@@ -167,13 +167,15 @@ async function searchProductDb(term: string): Promise<any[]> {
           OR codigo_atual ILIKE '%' || $1 || '%'
           OR codigo_fabrica ILIKE '%' || $1 || '%'
           OR codigo_barras_atual ILIKE '%' || $1 || '%'
+          OR codigos_alternativos ILIKE '%' || $1 || '%'
           OR descricao ILIKE '%' || $1 || '%'
        ORDER BY 
           CASE 
             WHEN UPPER(codigo_atual) = UPPER($1) THEN 1
             WHEN UPPER(codigo_fabrica) = UPPER($1) THEN 2
             WHEN UPPER(codigo_barras_atual) = UPPER($1) THEN 3
-            ELSE 4
+            WHEN codigos_alternativos ILIKE '%' || $1 || '%' THEN 4
+            ELSE 5
           END
        LIMIT 6`,
       [clean]
@@ -1991,6 +1993,9 @@ export async function processChatMessage(message: string, sessionId: string): Pr
   // -------------------------------------------------------------
   // 9. CONSULTA SIMPLES DE LOCALIZAÇÃO OU ESTOQUE
   // -------------------------------------------------------------
+  // -------------------------------------------------------------
+  // 9. CONSULTA SIMPLES DE LOCALIZAÇÃO OU ESTOQUE
+  // -------------------------------------------------------------
   const isSearchIntent = 
     lower.includes('onde') || 
     lower.includes('localiz') || 
@@ -2001,9 +2006,15 @@ export async function processChatMessage(message: string, sessionId: string): Pr
     lower.includes('peca') || 
     lower.includes('tem ');
 
-  if (isSearchIntent) {
-    const codeMatch = cleanMsg.match(/\b([A-Za-z0-9\.-]{4,20})\b/);
-    const searchTerm = codeMatch ? codeMatch[1] : cleanMsg.replace(/(onde|está|esta|a|peça|peca|tem|qual|localizacao|locacao|no|estoque)/gi, '').trim();
+  if (isSearchIntent && !lower.startsWith('altere ') && !lower.startsWith('cadastre ') && !corredorMentionMatch) {
+    // Melhor extração: Remove palavras de parada agressivamente
+    const stopWords = ['onde', 'esta', 'está', 'a', 'o', 'do', 'da', 'de', 'peça', 'peca', 'tem', 'qual', 'localizacao', 'locacao', 'locação', 'no', 'na', 'estoque', 'item', 'itens', 'produto', 'produtos', 'por', 'favor', 'gostaria', 'saber', 'como'];
+    let searchTerm = cleanMsg;
+    stopWords.forEach(word => {
+      const reg = new RegExp(`\\b${word}\\b`, 'gi');
+      searchTerm = searchTerm.replace(reg, '');
+    });
+    searchTerm = searchTerm.trim().replace(/\s+/g, ' ');
 
     if (!searchTerm) {
       return 'Por favor, informe o código da peça ou o nome para consulta no estoque.';
@@ -2011,7 +2022,17 @@ export async function processChatMessage(message: string, sessionId: string): Pr
 
     const prods = await searchProductDb(searchTerm);
     if (prods.length === 0) {
-      return `❌ **INFORMAÇÃO NÃO ENCONTRADA:**\nNenhum produto cadastrado com o código ou nome **"${searchTerm}"**.`;
+      return `❌ **INFORMAÇÃO NÃO ENCONTRADA:**\nNenhum produto cadastrado com o código ou nome **"${searchTerm}"**. \n\n*Nota: Verifique se o código ou termo foi digitado corretamente.*`;
+    }
+
+    if (prods.length > 1) {
+      let reply = `🔍 **Encontrei ${prods.length} itens que correspondem a "${searchTerm}". Qual informação você quer?**\n\n`;
+      prods.forEach((p, idx) => {
+        const loc = p.locacao || [p.corredor, p.baia, p.nivel].filter(Boolean).join('-') || 'Sem locação';
+        reply += `* **${p.codigo_atual}** - ${p.descricao} (Locação: \`${loc}\`)\n`;
+      });
+      reply += `\nPor favor, digite o código exato da peça que deseja consultar.`;
+      return reply;
     }
 
     const p = prods[0];

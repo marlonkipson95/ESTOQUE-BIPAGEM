@@ -34,6 +34,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
 }) => {
   const [viewState, setViewState] = useState<'list' | 'edit'>('list');
   const [listas, setListas] = useState<QuickList[]>([]);
+  const [searchQueryLists, setSearchQueryLists] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [mensagemSucesso, setMensagemSucesso] = useState('');
@@ -60,18 +61,22 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
   const [itemComentario, setItemComentario] = useState('');
 
   const [showDropdown, setShowDropdown] = useState(false);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const searchResults = useMemo(() => {
-    if (!products || products.length === 0) return [];
-    if (!itemCodigo.trim()) return [];
+    if (!products || !Array.isArray(products) || products.length === 0) return [];
+    if (!itemCodigo || typeof itemCodigo !== 'string' || !itemCodigo.trim()) return [];
+    
     const term = itemCodigo.toUpperCase().trim();
     const termWithoutE = term.endsWith('E') ? term.slice(0, -1) : term;
     
     return products.filter(p => {
-      const desc = (p.descricao || '').toUpperCase();
-      const ca = (p.codigo_atual || '').toUpperCase();
-      const cf = (p.codigo_fabrica || '').toUpperCase();
-      const cb = (p.codigo_barras_atual || '').toUpperCase();
+      if (!p) return false;
+      const desc = String(p.descricao || '').toUpperCase();
+      const ca = String(p.codigo_atual || '').toUpperCase();
+      const cf = String(p.codigo_fabrica || '').toUpperCase();
+      const cb = String(p.codigo_barras_atual || '').toUpperCase();
+      
       return (
         desc.includes(term) ||
         ca.includes(term) || ca.includes(termWithoutE) ||
@@ -215,7 +220,8 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
     setItemCodigo(val);
     setShowDropdown(true);
     if (val.trim().length >= 3) {
-      executarLookup(val);
+      if (debounceTimeoutRef.current) clearTimeout(debounceTimeoutRef.current);
+      debounceTimeoutRef.current = setTimeout(() => executarLookup(val), 400);
     } else {
       setItemInfoLookup(null);
     }
@@ -388,6 +394,21 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
   // ==========================================
   // RENDERIZAÇÃO: MODO LISTAGEM
   // ==========================================
+  
+  const listasFiltradas = useMemo(() => {
+    if (!searchQueryLists.trim()) return listas;
+    const lowerQ = searchQueryLists.toLowerCase().trim();
+    return listas.filter(lista => {
+      if (lista.nome.toLowerCase().includes(lowerQ)) return true;
+      if (lista.responsavel && lista.responsavel.toLowerCase().includes(lowerQ)) return true;
+      if (lista.itens && lista.itens.some(item => 
+        item.codigo.toLowerCase().includes(lowerQ) || 
+        (item.descricao && item.descricao.toLowerCase().includes(lowerQ))
+      )) return true;
+      return false;
+    });
+  }, [listas, searchQueryLists]);
+
   if (viewState === 'list') {
     return (
       <div className="space-y-6">
@@ -407,23 +428,35 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={carregarListas}
-              disabled={loading}
-              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700/80 hover:bg-slate-700 transition"
-              title="Recarregar Listas"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-              Atualizar
-            </button>
-            <button
-              onClick={handleIniciarNovaLista}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-600/30 transition transform active:scale-95"
-            >
-              <Plus className="h-4 w-4" />
-              Nova Lista Rápida
-            </button>
+          <div className="flex flex-col sm:flex-row items-center gap-3">
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <input
+                type="text"
+                value={searchQueryLists}
+                onChange={e => setSearchQueryLists(e.target.value)}
+                placeholder="Buscar lista ou código..."
+                className="w-full rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-white placeholder-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 transition"
+              />
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <button
+                onClick={carregarListas}
+                disabled={loading}
+                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800/80 border border-slate-300 dark:border-slate-700/80 hover:bg-slate-700 transition"
+                title="Recarregar Listas"
+              >
+                <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+                Atualizar
+              </button>
+              <button
+                onClick={handleIniciarNovaLista}
+                className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-600/30 transition transform active:scale-95"
+              >
+                <Plus className="h-4 w-4" />
+                Nova Lista
+              </button>
+            </div>
           </div>
         </div>
 
@@ -450,7 +483,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {listas.map(lista => (
+            {listasFiltradas.map(lista => (
               <div
                 key={lista.id}
                 className="group relative rounded-2xl bg-slate-900/80 border border-slate-200 dark:border-slate-800 p-5 shadow-sm hover:border-indigo-500/50 hover:bg-slate-800/40 transition flex flex-col justify-between"
@@ -530,7 +563,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                 value={currentLista.nome}
                 onChange={e => setCurrentLista(prev => ({ ...prev, nome: e.target.value }))}
                 placeholder="Nome da lista (ex: Contagem Setembro)"
-                className="text-base font-bold text-slate-900 dark:text-white bg-transparent border-b border-dashed border-slate-300 dark:border-slate-700 focus:border-indigo-500 focus:outline-none px-1 py-0.5"
+                className="text-base font-bold text-slate-900 dark:text-white placeholder-slate-400 bg-transparent border-b border-dashed border-slate-300 dark:border-slate-700 focus:border-indigo-500 focus:outline-none px-1 py-0.5"
               />
             </div>
           </div>
@@ -622,7 +655,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                   value={itemCodigo}
                   onChange={handleCodigoChange}
                   placeholder="Bipar ou digitar..."
-                  className="w-full rounded-xl bg-slate-800/90 border border-slate-300 dark:border-slate-700 px-3 py-2.5 text-sm text-white font-mono placeholder-slate-500 dark:placeholder-slate-400 font-bold text-slate-100 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 pr-10"
+                  className="w-full rounded-xl bg-white dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 px-3 py-2.5 text-sm text-slate-900 dark:text-white font-mono placeholder-slate-400 font-bold focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 pr-10"
                 />
                 <button
                   type="button"
@@ -661,7 +694,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                 value={itemLocacao}
                 onChange={e => setItemLocacao(e.target.value)}
                 placeholder="Ex: I-032-3 ou Corredor A"
-                className="w-full rounded-xl bg-slate-800/90 border border-slate-300 dark:border-slate-700 px-3 py-2.5 text-sm text-white placeholder-slate-500 dark:placeholder-slate-400 font-bold text-slate-100 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="w-full rounded-xl bg-white dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 px-3 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 font-bold focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
             </div>
 
@@ -675,7 +708,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                 value={itemComentario}
                 onChange={e => setItemComentario(e.target.value)}
                 placeholder="Ex: caixa danificada, 3 un..."
-                className="w-full rounded-xl bg-slate-800/90 border border-slate-300 dark:border-slate-700 px-3 py-2.5 text-sm text-white placeholder-slate-500 dark:placeholder-slate-400 font-bold text-slate-100 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="w-full rounded-xl bg-white dark:bg-slate-800/90 border border-slate-300 dark:border-slate-700 px-3 py-2.5 text-sm text-slate-900 dark:text-white placeholder-slate-400 font-bold focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
               />
             </div>
 
@@ -771,7 +804,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                           type="text"
                           value={editItemValues.codigo}
                           onChange={e => setEditItemValues(prev => ({ ...prev, codigo: e.target.value }))}
-                          className="w-full rounded-lg bg-slate-900 border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs text-white font-mono focus:border-indigo-500 focus:outline-none"
+                          className="w-full rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs text-slate-900 dark:text-white font-mono focus:border-indigo-500 focus:outline-none"
                         />
                       </div>
 
@@ -782,7 +815,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                           value={editItemValues.locacao}
                           onChange={e => setEditItemValues(prev => ({ ...prev, locacao: e.target.value }))}
                           placeholder="Ex: I-032-3 ou Corredor A"
-                          className="w-full rounded-lg bg-slate-900 border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs text-white focus:border-indigo-500 focus:outline-none"
+                          className="w-full rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:border-indigo-500 focus:outline-none"
                         />
                       </div>
 
@@ -793,7 +826,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
                           value={editItemValues.comentario}
                           onChange={e => setEditItemValues(prev => ({ ...prev, comentario: e.target.value }))}
                           placeholder="Ex: caixa danificada..."
-                          className="w-full rounded-lg bg-slate-900 border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs text-white focus:border-indigo-500 focus:outline-none"
+                          className="w-full rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 px-3 py-1.5 text-xs text-slate-900 dark:text-white focus:border-indigo-500 focus:outline-none"
                         />
                       </div>
                     </div>

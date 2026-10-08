@@ -139,10 +139,10 @@ export const OrcamentoView: React.FC<OrcamentoViewProps> = ({
     const termWithoutE = term.endsWith('E') ? term.slice(0, -1) : term;
     
     return products.filter(p => {
-      const desc = p.descricao.toUpperCase();
-      const ca = p.codigo_atual.toUpperCase();
-      const cf = p.codigo_fabrica.toUpperCase();
-      const cb = p.codigo_barras_atual?.toUpperCase() || '';
+      const desc = (p.descricao || '').toUpperCase();
+      const ca = (p.codigo_atual || '').toUpperCase();
+      const cf = (p.codigo_fabrica || '').toUpperCase();
+      const cb = (p.codigo_barras_atual || '').toUpperCase();
       
       return (
         desc.includes(term) ||

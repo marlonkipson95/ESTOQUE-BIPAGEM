@@ -72,8 +72,16 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   // Novos Campos
   const [estoqueFisico, setEstoqueFisico] = useState<number | string>(product.estoque_fisico ?? '');
   const [ncm, setNcm] = useState(product.ncm || '');
-  const [ultimaDataVenda, setUltimaDataVenda] = useState(product.ultima_data_venda || '');
-  const [ultimaDataCompra, setUltimaDataCompra] = useState(product.ultima_data_compra || '');
+  // Date normalization helper
+  const normalizeDateString = (d?: string | null) => {
+    if (!d) return '';
+    if (d.includes('T')) return d.split('T')[0];
+    if (d.includes('/')) return d.split('/').reverse().join('-');
+    return d;
+  };
+
+  const [ultimaDataVenda, setUltimaDataVenda] = useState(normalizeDateString(product.ultima_data_venda));
+  const [ultimaDataCompra, setUltimaDataCompra] = useState(normalizeDateString(product.ultima_data_compra));
 
   // New Code Replacement state
   const [showReplaceCodeModal, setShowReplaceCodeModal] = useState(false);
@@ -391,59 +399,59 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
         )}
 
         {/* Navigation Tabs */}
-        <div className="flex border-b border-slate-200 px-5 text-xs font-semibold dark:border-slate-800 bg-white dark:bg-slate-900 overflow-x-auto">
+        <div className="flex flex-wrap gap-2 border-b border-slate-200 p-3 text-[11px] sm:text-xs font-semibold dark:border-slate-800 bg-white dark:bg-slate-900">
           <button
             onClick={() => setActiveTab('info')}
-            className={`border-b-2 py-3 px-3 transition whitespace-nowrap ${
+            className={`rounded-lg py-2 px-3 transition flex items-center gap-1.5 whitespace-nowrap ${
               activeTab === 'info'
-                ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 font-bold shadow-sm'
+                : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200'
             }`}
           >
             Dados & Estoque
           </button>
           <button
             onClick={() => setActiveTab('location')}
-            className={`border-b-2 py-3 px-3 transition whitespace-nowrap ${
+            className={`rounded-lg py-2 px-3 transition flex items-center gap-1.5 whitespace-nowrap ${
               activeTab === 'location'
-                ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 font-bold shadow-sm'
+                : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200'
             }`}
           >
             Localização Física
           </button>
           <button
             onClick={() => setActiveTab('history')}
-            className={`border-b-2 py-3 px-3 transition flex items-center gap-1.5 whitespace-nowrap ${
+            className={`rounded-lg py-2 px-3 transition flex items-center gap-1.5 whitespace-nowrap ${
               activeTab === 'history'
-                ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 font-bold shadow-sm'
+                : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200'
             }`}
           >
             <History className="h-3.5 w-3.5" />
-            <span>Histórico de Códigos ({historyList.length})</span>
+            <span>Histórico ({historyList.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('relacionados')}
-            className={`border-b-2 py-3 px-3 transition flex items-center gap-1.5 whitespace-nowrap ${
+            className={`rounded-lg py-2 px-3 transition flex items-center gap-1.5 whitespace-nowrap ${
               activeTab === 'relacionados'
-                ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 font-bold shadow-sm'
+                : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200'
             }`}
           >
             <Layers className="h-3.5 w-3.5" />
-            <span>Produtos Relacionados ({relatedList.length})</span>
+            <span>Relacionados ({relatedList.length})</span>
           </button>
           <button
             onClick={() => setActiveTab('audit')}
-            className={`border-b-2 py-3 px-3 transition flex items-center gap-1.5 whitespace-nowrap ${
+            className={`rounded-lg py-2 px-3 transition flex items-center gap-1.5 whitespace-nowrap ${
               activeTab === 'audit'
-                ? 'border-indigo-600 text-indigo-600 dark:border-indigo-400 dark:text-indigo-400 font-bold'
-                : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 font-bold shadow-sm'
+                : 'text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-slate-200'
             }`}
           >
             <Clock className="h-3.5 w-3.5" />
-            <span>Auditoria & Desfazer</span>
+            <span>Auditoria</span>
           </button>
         </div>
 
@@ -511,47 +519,83 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* CÓDIGO DE BARRAS & NCM */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
                 <div>
                   <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
                     Código de Barras Atual (EAN)
                   </label>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        disabled
-                        value={currentProduct.codigo_barras_atual || 'Não cadastrado'}
-                        className="flex-1 rounded-lg border border-slate-200 bg-slate-100 p-2.5 font-mono text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400 cursor-not-allowed"
-                      />
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      disabled
+                      value={currentProduct.codigo_barras_atual || 'Não cadastrado'}
+                      className="flex-1 min-w-0 rounded-lg border border-slate-200 bg-slate-100 p-2.5 font-mono text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400 cursor-not-allowed truncate"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewCodeType('codigo_barras');
+                        setShowReplaceCodeModal(true);
+                      }}
+                      className="rounded-lg bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-300 transition shrink-0"
+                    >
+                      Trocar
+                    </button>
+                    {currentProduct.codigo_barras_atual && (
                       <button
                         type="button"
-                        onClick={() => {
-                          setNewCodeType('codigo_barras');
-                          setShowReplaceCodeModal(true);
-                        }}
-                        className="rounded-lg bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-950/60 dark:text-indigo-300 transition"
+                        onClick={handleUnlinkBarcode}
+                        className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-100 dark:bg-rose-950/60 dark:text-rose-400 transition flex items-center gap-1 border border-rose-200 dark:border-rose-900/40 shrink-0"
+                        title="Desvincular código de barras deste produto"
                       >
-                        Trocar
+                        <Unlink className="h-3.5 w-3.5" />
+                        <span className="hidden sm:inline">Desvincular</span>
                       </button>
-                      {currentProduct.codigo_barras_atual && (
-                        <button
-                          type="button"
-                          onClick={handleUnlinkBarcode}
-                          className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-100 dark:bg-rose-950/60 dark:text-rose-400 transition flex items-center gap-1 border border-rose-200 dark:border-rose-900/40 shrink-0"
-                          title="Desvincular código de barras deste produto"
-                        >
-                          <Unlink className="h-3.5 w-3.5" />
-                          <span>Desvincular</span>
-                        </button>
-                      )}
-                    </div>
+                    )}
+                  </div>
                 </div>
 
-                <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      NCM
+                    </label>
+                    <input
+                      type="text"
+                      value={ncm}
+                      onChange={e => setNcm(e.target.value)}
+                      placeholder="Ex: 8544.42.00"
+                      className="w-full rounded-lg border border-slate-300 p-2.5 font-mono text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
+                      Est. Mínimo
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={estoqueMinimo}
+                      onChange={e => setEstoqueMinimo(parseInt(e.target.value) || 0)}
+                      className="w-full rounded-lg border border-slate-300 p-2.5 font-mono text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-center"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* CONTROLE DE ESTOQUE E DATAS */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 border-t border-slate-100 dark:border-slate-800 pt-4">
+                <div className="space-y-3 bg-slate-50 dark:bg-slate-800/30 p-3 rounded-xl border border-slate-100 dark:border-slate-800/50">
+                  <div className="flex items-center gap-2">
+                    <span className="font-black text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Controle de Estoque
+                    </span>
+                  </div>
                   <div className="grid grid-cols-3 gap-2">
                     <div>
-                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-xs">
-                        Estoque Contábil
+                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-[11px] uppercase whitespace-nowrap">
+                        Contábil
                       </label>
                       <input
                         type="number"
@@ -562,8 +606,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-xs">
-                        Estoque Físico
+                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-[11px] uppercase whitespace-nowrap">
+                        Físico
                       </label>
                       <input
                         type="number"
@@ -574,7 +618,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       />
                     </div>
                     <div>
-                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-xs">
+                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-[11px] uppercase whitespace-nowrap">
                         Diferença
                       </label>
                       <div className={`w-full rounded-lg border p-2.5 font-mono font-black text-center ${
@@ -588,73 +632,8 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                       </div>
                     </div>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-[11px]">
-                        NCM
-                      </label>
-                      <input
-                        type="text"
-                        value={ncm}
-                        onChange={e => setNcm(e.target.value)}
-                        placeholder="Ex: 8544.42.00"
-                        className="w-full rounded-lg border border-slate-300 p-2 font-mono text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-[11px]">
-                        Est. Mínimo
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={quantidade}
-                        onChange={e => setQuantidade(parseInt(e.target.value) || 0)}
-                        className="w-full rounded-lg border border-slate-300 p-2.5 font-mono font-bold text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-center"
-                      />
-                    </div>
-                    <div>
-                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1">
-                        Est. Mínimo
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={estoqueMinimo}
-                        onChange={e => setEstoqueMinimo(parseInt(e.target.value) || 0)}
-                        className="w-full rounded-lg border border-slate-300 p-2 font-mono text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white text-center"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-[10px] uppercase">
-                        Última Compra
-                      </label>
-                      <input
-                        type="date"
-                        value={ultimaDataCompra}
-                        onChange={e => setUltimaDataCompra(e.target.value)}
-                        className="w-full rounded-lg border border-slate-300 p-1.5 text-xs font-mono text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                      />
-                    </div>
-                    <div>
-                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-[10px] uppercase">
-                        Última Venda
-                      </label>
-                      <input
-                        type="date"
-                        value={ultimaDataVenda}
-                        onChange={e => setUltimaDataVenda(e.target.value)}
-                        className="w-full rounded-lg border border-slate-300 p-1.5 text-xs font-mono text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1 pt-1 justify-end">
-                    <span className="text-[10px] text-slate-400 mr-1">Ajuste rápido:</span>
+                  <div className="flex items-center gap-1 justify-end">
+                    <span className="text-[10px] text-slate-400 mr-1">Ajuste rápido (Contábil):</span>
                     <button
                       type="button"
                       disabled={quantidade <= 0}
@@ -677,6 +656,38 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                     >
                       +5
                     </button>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <span className="font-black text-[11px] uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                      Datas Importantes
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-[11px] uppercase">
+                        Última Compra
+                      </label>
+                      <input
+                        type="date"
+                        value={ultimaDataCompra}
+                        onChange={e => setUltimaDataCompra(e.target.value)}
+                        className="w-full rounded-lg border border-slate-300 p-2.5 text-xs font-mono text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block font-bold text-slate-700 dark:text-slate-300 mb-1 text-[11px] uppercase">
+                        Última Venda
+                      </label>
+                      <input
+                        type="date"
+                        value={ultimaDataVenda}
+                        onChange={e => setUltimaDataVenda(e.target.value)}
+                        className="w-full rounded-lg border border-slate-300 p-2.5 text-xs font-mono text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+                      />
+                    </div>
                   </div>
                 </div>
               </div>

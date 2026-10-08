@@ -39,7 +39,7 @@ export const LocationBadge: React.FC<LocationBadgeProps> = ({
         <div className="flex items-center justify-between border-b border-slate-700/80 pb-2.5">
           <div className="flex items-center gap-2 text-indigo-300">
             <MapPin className="h-5 w-5 text-indigo-400" />
-            <span className="text-xs font-black tracking-widest uppercase">Localização Física no Galpão</span>
+            <span className="text-xs font-black tracking-widest uppercase">Localização Física</span>
           </div>
           {locacao && (
             <span className="font-mono text-sm font-bold tracking-wider rounded bg-indigo-500/20 px-2.5 py-0.5 text-indigo-200 border border-indigo-400/30">
