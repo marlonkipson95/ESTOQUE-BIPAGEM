@@ -23,6 +23,7 @@ import { Product, ProductCodeHistory, CodeType } from '../../types';
 import { storageService } from '../../services/storageService';
 import { apiService } from '../../services/apiService';
 import { beepService } from '../../services/beepService';
+import { authService } from '../../services/authService';
 import { LocationBadge } from '../common/LocationBadge';
 
 interface ProductDetailModalProps {
@@ -40,6 +41,12 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
 }) => {
   const [currentProduct, setCurrentProduct] = useState<Product>(product);
   const [activeTab, setActiveTab] = useState<'info' | 'location' | 'history' | 'relacionados' | 'audit'>('info');
+
+  const { user } = authService.getSession();
+  const canEditBasico = user?.perm_alterar_basico ?? true;
+  const canEditPreco = user?.perm_alterar_preco ?? true;
+  const canEditLocacao = user?.perm_alterar_locacao ?? true;
+  const canEditDesc = user?.perm_alterar_desc ?? true;
 
   // Form states for basic info & location
   const [descricao, setDescricao] = useState(product.descricao);
@@ -451,9 +458,10 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 <input
                   type="text"
                   required
+                  disabled={!canEditDesc}
                   value={descricao}
                   onChange={e => setDescricao(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 p-2.5 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white font-medium"
+                  className="w-full rounded-lg border border-slate-300 p-2.5 text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -477,6 +485,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   </label>
                   <input
                     type="text"
+                    disabled={!canEditBasico}
                     value={codigoFabrica}
                     onChange={e => setCodigoFabrica(e.target.value)}
                     placeholder="Ex: 504.02.1"
@@ -729,6 +738,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                         type="number"
                         step="0.01"
                         min="0"
+                        disabled={!canEditPreco}
                         value={precoTabela}
                         onChange={e => setPrecoTabela(e.target.value)}
                         placeholder="0,00"
@@ -747,6 +757,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                         type="number"
                         step="0.01"
                         min="0"
+                        disabled={!canEditPreco}
                         value={precoSugerido}
                         onChange={e => setPrecoSugerido(e.target.value)}
                         placeholder="0,00"
@@ -765,6 +776,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                         type="number"
                         step="0.01"
                         min="0"
+                        disabled={!canEditPreco}
                         value={precoMinimo}
                         onChange={e => setPrecoMinimo(e.target.value)}
                         placeholder="0,00"
@@ -809,6 +821,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   </label>
                   <input
                     type="text"
+                    disabled={!canEditLocacao}
                     value={corredor}
                     onChange={e => setCorredor(e.target.value.toUpperCase())}
                     placeholder="Ex: 03 ou A"
@@ -822,6 +835,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   </label>
                   <input
                     type="text"
+                    disabled={!canEditLocacao}
                     value={baia}
                     onChange={e => setBaia(e.target.value.toUpperCase())}
                     placeholder="Ex: B12"
@@ -835,6 +849,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                   </label>
                   <input
                     type="text"
+                    disabled={!canEditLocacao}
                     value={nivel}
                     onChange={e => setNivel(e.target.value.toUpperCase())}
                     placeholder="Ex: 04"
@@ -849,6 +864,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 </label>
                 <input
                   type="text"
+                  disabled={!canEditLocacao}
                   value={locacao}
                   onChange={e => setLocacao(e.target.value)}
                   placeholder="Ex: 03-B12-04 ou Prateleira 4 Central"
