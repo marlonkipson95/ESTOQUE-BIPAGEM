@@ -283,6 +283,7 @@ export default function App() {
 
           {activeModule === 'anotacoes' && (
             <AnotacoesView
+              products={products}
               onOpenQuickScan={() => setIsCameraScannerOpen(true)}
               externalScannedCode={incomingScannedCode}
               onClearExternalScannedCode={() => setIncomingScannedCode('')}

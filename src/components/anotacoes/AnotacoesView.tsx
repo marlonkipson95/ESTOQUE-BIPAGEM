@@ -1,14 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   ClipboardList, Plus, Search, Trash2, Printer, Save, 
   ChevronLeft, Check, AlertCircle, Camera, MapPin, Tag, 
   FileText, Calendar, Sparkles, RefreshCw, X, Edit3
 } from 'lucide-react';
-import { QuickList, QuickListItem } from '../../types';
+import { QuickList, QuickListItem, Product } from '../../types';
 import { apiService } from '../../services/apiService';
 import { beepService } from '../../services/beepService';
 
 interface AnotacoesViewProps {
+  products?: Product[];
   onOpenQuickScan: () => void;
   externalScannedCode?: string;
   onClearExternalScannedCode?: () => void;
@@ -26,6 +27,7 @@ const SUGESTOES_COMENTARIOS = [
 ];
 
 export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
+  products = [],
   onOpenQuickScan,
   externalScannedCode = '',
   onClearExternalScannedCode
@@ -56,6 +58,47 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
   const [itemCodigo, setItemCodigo] = useState('');
   const [itemLocacao, setItemLocacao] = useState('');
   const [itemComentario, setItemComentario] = useState('');
+
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  const searchResults = useMemo(() => {
+    if (!products || products.length === 0) return [];
+    if (!itemCodigo.trim()) return [];
+    const term = itemCodigo.toUpperCase().trim();
+    const termWithoutE = term.endsWith('E') ? term.slice(0, -1) : term;
+    
+    return products.filter(p => {
+      const desc = (p.descricao || '').toUpperCase();
+      const ca = (p.codigo_atual || '').toUpperCase();
+      const cf = (p.codigo_fabrica || '').toUpperCase();
+      const cb = (p.codigo_barras_atual || '').toUpperCase();
+      const alt = (p.codigos_alternativos || []).join(' ').toUpperCase();
+      
+      return (
+        desc.includes(term) ||
+        ca.includes(term) || ca.includes(termWithoutE) ||
+        cf.includes(term) || cf.includes(termWithoutE) ||
+        cb.includes(term) || cb.includes(termWithoutE) ||
+        alt.includes(term) || alt.includes(termWithoutE)
+      );
+    }).slice(0, 10);
+  }, [itemCodigo, products]);
+
+  const handleSelectProductFromDropdown = (p: Product) => {
+    const cod = p.codigo_fabrica || p.codigo_atual || '';
+    setItemCodigo(cod);
+    setItemInfoLookup({
+      found: true,
+      codigo: p.codigo_atual,
+      descricao: p.descricao,
+      locacao: p.locacao || ''
+    });
+    if (p.locacao) {
+      setItemLocacao(p.locacao);
+    }
+    setShowDropdown(false);
+  };
+
   const [itemInfoLookup, setItemInfoLookup] = useState<{
     found: boolean;
     descricao?: string;
@@ -173,6 +216,7 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
   const handleCodigoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setItemCodigo(val);
+    setShowDropdown(true);
     if (val.trim().length >= 3) {
       executarLookup(val);
     } else {
