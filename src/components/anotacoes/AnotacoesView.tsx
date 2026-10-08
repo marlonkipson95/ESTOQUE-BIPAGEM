@@ -72,14 +72,11 @@ export const AnotacoesView: React.FC<AnotacoesViewProps> = ({
       const ca = (p.codigo_atual || '').toUpperCase();
       const cf = (p.codigo_fabrica || '').toUpperCase();
       const cb = (p.codigo_barras_atual || '').toUpperCase();
-      const alt = (p.codigos_alternativos || []).join(' ').toUpperCase();
-      
       return (
         desc.includes(term) ||
         ca.includes(term) || ca.includes(termWithoutE) ||
         cf.includes(term) || cf.includes(termWithoutE) ||
-        cb.includes(term) || cb.includes(termWithoutE) ||
-        alt.includes(term) || alt.includes(termWithoutE)
+        cb.includes(term) || cb.includes(termWithoutE) 
       );
     }).slice(0, 10);
   }, [itemCodigo, products]);
