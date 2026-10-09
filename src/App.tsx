@@ -17,6 +17,8 @@ import { Header } from './components/common/Header';
 import { MobileNav } from './components/common/MobileNav';
 import { PWAInstallBanner } from './components/common/PWAInstallBanner';
 import { CameraScannerModal } from './components/common/CameraScannerModal';
+import { PhotoScannerModal } from './components/common/PhotoScannerModal';
+import { VisionResultModal } from './components/common/VisionResultModal';
 import { ProductDetailModal } from './components/produtos/ProductDetailModal';
 import { NewProductModal } from './components/produtos/NewProductModal';
 import { LoginView } from './components/auth/LoginView';
@@ -40,6 +42,8 @@ export default function App() {
   const [activeModule, setActiveModule] = useState<AppModule>('bipagem');
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const [isCameraScannerOpen, setIsCameraScannerOpen] = useState(false);
+  const [isPhotoScannerOpen, setIsPhotoScannerOpen] = useState(false);
+  const [isVisionResultOpen, setIsVisionResultOpen] = useState(false);
 
   // Data State from Storage
   const [products, setProducts] = useState<Product[]>([]);
@@ -160,8 +164,8 @@ export default function App() {
       const res = await apiService.identifyByPhoto(base64Data);
       if (res.success && res.data) {
         setIncomingVisionData(res.data);
-        setActiveModule('bipagem'); // Force switch to bipagem for processing
-        setIsCameraScannerOpen(false);
+        setIsPhotoScannerOpen(false);
+        setIsVisionResultOpen(true);
       } else {
         alert('Erro ao identificar mercadoria pela foto: ' + (res.error || 'Erro desconhecido.'));
       }
@@ -235,6 +239,7 @@ export default function App() {
           onLogout={handleLogout}
           onOpenMobileMenu={() => setIsMobileDrawerOpen(true)}
           onOpenQuickScan={() => setIsCameraScannerOpen(true)}
+          onOpenPhotoScan={() => setIsPhotoScannerOpen(true)}
           totalProducts={products.length}
         />
 
@@ -382,7 +387,29 @@ export default function App() {
         isOpen={isCameraScannerOpen}
         onClose={() => setIsCameraScannerOpen(false)}
         onScan={handleCameraScan}
+      />
+
+      {/* Photo AI Scanner Modal */}
+      <PhotoScannerModal
+        isOpen={isPhotoScannerOpen}
+        onClose={() => setIsPhotoScannerOpen(false)}
         onPhotoIdentify={handlePhotoIdentify}
+      />
+
+      {/* AI Vision Result Modal */}
+      <VisionResultModal
+        isOpen={isVisionResultOpen}
+        onClose={() => {
+          setIsVisionResultOpen(false);
+          setIncomingVisionData(null);
+        }}
+        visionData={incomingVisionData}
+        onSaveSuccess={() => {
+          refreshData();
+          setIsVisionResultOpen(false);
+          setIncomingVisionData(null);
+        }}
+        currentUser={authSession.user?.username || 'Usuário Desconhecido'}
       />
     </div>
   );

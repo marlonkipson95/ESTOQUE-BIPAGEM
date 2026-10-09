@@ -23,6 +23,7 @@ interface HeaderProps {
   onLogout?: () => void;
   onOpenMobileMenu: () => void;
   onOpenQuickScan: () => void;
+  onOpenPhotoScan: () => void;
   unresolvedAlertsCount?: number;
   totalProducts?: number;
 }
@@ -45,6 +46,7 @@ export const Header: React.FC<HeaderProps> = ({
   onLogout,
   onOpenMobileMenu,
   onOpenQuickScan,
+  onOpenPhotoScan,
   unresolvedAlertsCount = 0,
   totalProducts = 0,
 }) => {
@@ -167,14 +169,24 @@ export const Header: React.FC<HeaderProps> = ({
           </button>
         )}
 
+        {/* Quick Photo Scanner Trigger */}
+        <button
+          onClick={onOpenPhotoScan}
+          className="flex items-center gap-1.5 rounded-lg bg-indigo-100 dark:bg-indigo-900/50 px-3 py-2 text-xs md:text-sm font-semibold text-indigo-700 dark:text-indigo-300 shadow-sm hover:bg-indigo-200 dark:hover:bg-indigo-800 transition"
+          title="Tirar foto para identificar produto via IA"
+        >
+          <Camera className="h-4 w-4" />
+          <span className="hidden sm:inline">Identificar (IA)</span>
+        </button>
+
         {/* Quick Camera Scanner Trigger */}
         <button
           onClick={onOpenQuickScan}
           className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-3 py-2 text-xs md:text-sm font-semibold text-white shadow hover:bg-indigo-500 active:scale-95 transition"
           title="Abrir scanner de código de barras pela câmera"
         >
-          <Camera className="h-4 w-4" />
-          <span className="hidden sm:inline">Câmera</span>
+          <Barcode className="h-4 w-4" />
+          <span className="hidden sm:inline">Bipar</span>
         </button>
       </div>
     </header>
