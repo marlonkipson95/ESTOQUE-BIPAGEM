@@ -343,6 +343,7 @@ export default function App() {
           isDrawerOpen={isMobileDrawerOpen}
           onCloseDrawer={() => setIsMobileDrawerOpen(false)}
           onOpenQuickScan={() => setIsCameraScannerOpen(true)}
+          onOpenPhotoScan={() => setIsPhotoScannerOpen(true)}
           totalProductsCount={products.length}
           currentUser={authSession.user}
           onLogout={handleLogout}

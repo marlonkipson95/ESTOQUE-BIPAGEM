@@ -40,10 +40,6 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
             facingMode: { ideal: facingMode },
             width: { ideal: 1280 },
             height: { ideal: 720 },
-            advanced: [
-              { focusMode: 'continuous' },
-              { exposureMode: 'continuous' },
-            ] as any,
           },
         };
 
@@ -97,7 +93,10 @@ export const PhotoScannerModal: React.FC<PhotoScannerModalProps> = ({
   };
 
   const handleAiPhotoClick = () => {
-    if (!videoRef.current) return;
+    if (!videoRef.current || videoRef.current.videoWidth === 0) {
+      setError('Aguarde a câmera iniciar completamente.');
+      return;
+    }
     const canvas = document.createElement('canvas');
     canvas.width = videoRef.current.videoWidth;
     canvas.height = videoRef.current.videoHeight;

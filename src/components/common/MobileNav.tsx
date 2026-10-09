@@ -23,6 +23,7 @@ interface MobileNavProps {
   isDrawerOpen: boolean;
   onCloseDrawer: () => void;
   onOpenQuickScan: () => void;
+  onOpenPhotoScan?: () => void;
   totalProductsCount: number;
   currentUser?: SystemUser | null;
   onLogout?: () => void;
@@ -34,6 +35,7 @@ export const MobileNav: React.FC<MobileNavProps> = ({
   isDrawerOpen,
   onCloseDrawer,
   onOpenQuickScan,
+  onOpenPhotoScan,
   totalProductsCount,
   currentUser,
   onLogout,
@@ -63,6 +65,17 @@ export const MobileNav: React.FC<MobileNavProps> = ({
 
   return (
     <>
+      {/* Floating Action Button for Photo AI (Mobile) */}
+      {onOpenPhotoScan && (
+        <button
+          onClick={onOpenPhotoScan}
+          className="md:hidden fixed bottom-20 right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full bg-indigo-600 text-white shadow-lg hover:bg-indigo-500 active:scale-95 transition-transform"
+          title="Identificar (IA)"
+        >
+          <Camera className="h-6 w-6" />
+        </button>
+      )}
+
       {/* Bottom Navigation Bar (Mobile Only, touch targets >= 44px) */}
       <nav className="fixed bottom-0 inset-x-0 z-40 flex h-16 items-center justify-around border-t border-slate-200 bg-white/98 px-2 py-1 shadow-lg md:hidden dark:border-slate-800 dark:bg-slate-900/98">
         {bottomItems.map(item => {
