@@ -1,3 +1,4 @@
+import { apiService } from './apiService';
 import { SystemUser, AuthSession } from '../types';
 
 const STORAGE_SESSION_KEY = 'kipson_auth_session';
@@ -137,7 +138,7 @@ class AuthService {
 
   async getUsers(): Promise<SystemUser[]> {
     try {
-      const res = await fetch('/api/usuarios');
+      const res = await apiService.fetchWithAuth('/api/usuarios');
       if (res.ok) {
         const data = await res.json();
         if (data.users && Array.isArray(data.users)) {
@@ -173,7 +174,7 @@ class AuthService {
     perm_alterar_desc?: boolean;
   }): Promise<{ success: boolean; user?: SystemUser; error?: string }> {
     try {
-      const res = await fetch('/api/usuarios', {
+      const res = await apiService.fetchWithAuth('/api/usuarios', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(user),
@@ -229,7 +230,7 @@ class AuthService {
     }
   ): Promise<{ success: boolean; user?: SystemUser; error?: string }> {
     try {
-      const res = await fetch(`/api/usuarios/${id}`, {
+      const res = await apiService.fetchWithAuth(`/api/usuarios/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data),
@@ -256,7 +257,7 @@ class AuthService {
 
   async deleteUser(id: number | string): Promise<{ success: boolean; error?: string }> {
     try {
-      const res = await fetch(`/api/usuarios/${id}`, {
+      const res = await apiService.fetchWithAuth(`/api/usuarios/${id}`, {
         method: 'DELETE',
       });
 
