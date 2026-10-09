@@ -4,8 +4,10 @@ import { getDbPool, checkDatabaseConnection } from './db.js';
 export const apiRouter = Router();
 import { chatRouter } from './chat.js';
 import { cosmosRouter, fetchCosmosProduct } from './cosmos.js';
+import { visionRouter } from './vision.js';
 apiRouter.use('/chat', chatRouter);
 apiRouter.use('/cosmos', cosmosRouter);
+apiRouter.use('/vision', visionRouter);
 
 // Fallback in-memory store if DATABASE_URL is not set yet
 interface MemoryProduct {

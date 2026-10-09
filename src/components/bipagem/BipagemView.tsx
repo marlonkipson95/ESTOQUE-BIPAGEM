@@ -37,6 +37,13 @@ interface BipagemViewProps {
   onOpenQuickScan: () => void;
   externalScannedCode?: string;
   onClearExternalScannedCode?: () => void;
+  externalVisionData?: {
+    codigo_fabrica?: string;
+    codigo_barras?: string;
+    fabricante?: string;
+    descricao_sugerida?: string;
+  } | null;
+  onClearExternalVisionData?: () => void;
 }
 
 export const BipagemView: React.FC<BipagemViewProps> = ({
@@ -45,6 +52,8 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
   onOpenQuickScan,
   externalScannedCode,
   onClearExternalScannedCode,
+  externalVisionData,
+  onClearExternalVisionData,
 }) => {
   const [inputCode, setInputCode] = useState('');
   const [scanResult, setScanResult] = useState<ScanResult | null>(null);
@@ -403,6 +412,34 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
       onClearExternalScannedCode?.();
     }
   }, [externalScannedCode]);
+
+  useEffect(() => {
+    if (externalVisionData) {
+      const code = externalVisionData.codigo_fabrica || externalVisionData.codigo_barras || '';
+      if (code) {
+        setInputCode(code);
+        // Emulate a not found scan but with vision data
+        const localResult = storageService.scanCode(code);
+        if (localResult.status === 'found_current') {
+          processBarcode(code);
+        } else {
+          setScanResult({
+            code: code,
+            status: 'not_found',
+            timestamp: new Date().toISOString(),
+            identifiedInfo: externalVisionData as any
+          });
+          setInlineDescricao(externalVisionData.descricao_sugerida || (externalVisionData.fabricante ? `PEÇA ${externalVisionData.fabricante}` : ''));
+          setNotFoundTab('link');
+          setSearchLinkTerm(externalVisionData.codigo_fabrica || '');
+          handleSearchLinkProducts(externalVisionData.codigo_fabrica || '');
+        }
+      } else {
+         setInlineError('A IA não conseguiu ler nenhum código legível na foto.');
+      }
+      onClearExternalVisionData?.();
+    }
+  }, [externalVisionData]);
 
   const processBarcode = async (rawCode: string) => {
     const code = rawCode.trim();

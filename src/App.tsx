@@ -54,6 +54,7 @@ export default function App() {
 
   // Scanned code carrier for modules
   const [incomingScannedCode, setIncomingScannedCode] = useState<string>('');
+  const [incomingVisionData, setIncomingVisionData] = useState<any>(null);
 
   // Consulta Filter State
   const [consultaFilters, setConsultaFilters] = useState<ConsultaFilters>({
@@ -152,6 +153,21 @@ export default function App() {
   const handleCameraScan = (code: string) => {
     handleBarcodeScanned(code);
     setIsCameraScannerOpen(false);
+  };
+
+  const handlePhotoIdentify = async (base64Data: string) => {
+    try {
+      const res = await apiService.identifyByPhoto(base64Data);
+      if (res.success && res.data) {
+        setIncomingVisionData(res.data);
+        setActiveModule('bipagem'); // Force switch to bipagem for processing
+        setIsCameraScannerOpen(false);
+      } else {
+        alert('Erro ao identificar mercadoria pela foto: ' + (res.error || 'Erro desconhecido.'));
+      }
+    } catch (err: any) {
+      alert('Erro na comunicação com a API de visão.');
+    }
   };
 
   // Open New Product modal with scanned code
@@ -257,6 +273,8 @@ export default function App() {
               onOpenQuickScan={() => setIsCameraScannerOpen(true)}
               externalScannedCode={incomingScannedCode}
               onClearExternalScannedCode={() => setIncomingScannedCode('')}
+              externalVisionData={incomingVisionData}
+              onClearExternalVisionData={() => setIncomingVisionData(null)}
             />
           )}
 
@@ -364,6 +382,7 @@ export default function App() {
         isOpen={isCameraScannerOpen}
         onClose={() => setIsCameraScannerOpen(false)}
         onScan={handleCameraScan}
+        onPhotoIdentify={handlePhotoIdentify}
       />
     </div>
   );

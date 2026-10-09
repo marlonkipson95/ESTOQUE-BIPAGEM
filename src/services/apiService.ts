@@ -23,6 +23,30 @@ class ApiService {
     return await res.json();
   }
 
+  async identifyByPhoto(imageBase64: string): Promise<{
+    success: boolean;
+    data: {
+      codigo_fabrica?: string;
+      codigo_barras?: string;
+      fabricante?: string;
+      descricao_sugerida?: string;
+    };
+    message?: string;
+  }> {
+    const res = await fetch(`${this.baseUrl}/vision/identify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageBase64 }),
+    });
+    
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || 'Falha ao analisar a foto da peça.');
+    }
+    
+    return await res.json();
+  }
+
   async scanCode(code: string): Promise<{
     status: 'found_current' | 'found_historical' | 'found_associated' | 'not_found';
     product?: Product;
@@ -39,6 +63,7 @@ class ApiService {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code }),
+      signal: AbortSignal.timeout(6000), // Prevent infinite hang, trigger offline fallback
     });
 
     if (!res.ok) {
@@ -470,7 +495,9 @@ class ApiService {
   }> {
     try {
       const clean = (gtin || '').trim().replace(/[\s\.-]/g, '');
-      const res = await fetch(`${this.baseUrl}/cosmos/gtin/${encodeURIComponent(clean)}`);
+      const res = await fetch(`${this.baseUrl}/cosmos/gtin/${encodeURIComponent(clean)}`, {
+        signal: AbortSignal.timeout(6000), // Prevent infinite hang
+      });
       const data = await res.json();
       return data;
     } catch (err: any) {

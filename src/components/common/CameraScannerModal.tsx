@@ -8,6 +8,7 @@ interface CameraScannerModalProps {
   isOpen: boolean;
   onClose: () => void;
   onScan: (code: string) => void;
+  onPhotoIdentify?: (base64Data: string) => void;
   title?: string;
 }
 
@@ -15,6 +16,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
   isOpen,
   onClose,
   onScan,
+  onPhotoIdentify,
   title = 'Escanear Código de Barras',
 }) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -217,6 +219,22 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
     }, 3500);
   };
 
+  const handleAiPhotoClick = () => {
+    if (!videoRef.current || !onPhotoIdentify) return;
+    const canvas = document.createElement('canvas');
+    canvas.width = videoRef.current.videoWidth;
+    canvas.height = videoRef.current.videoHeight;
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+      const base64Image = canvas.toDataURL('image/jpeg', 0.8);
+      beepService.playSuccess();
+      onPhotoIdentify(base64Image);
+      stopCamera();
+      onClose();
+    }
+  };
+
   const toggleTorch = async () => {
     if (!streamRef.current) return;
     const track = streamRef.current.getVideoTracks()[0];
@@ -317,8 +335,19 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
             </div>
           </div>
           
-          {/* Botão Capturar Código */}
-          <div className="absolute bottom-4 inset-x-0 flex justify-center z-20">
+          {/* Botão Capturar Código e Identificar com IA */}
+          <div className="absolute bottom-4 inset-x-0 flex flex-col items-center gap-3 z-20">
+            {onPhotoIdentify && (
+              <button
+                type="button"
+                onClick={handleAiPhotoClick}
+                className="inline-flex items-center gap-2 rounded-full px-6 py-2.5 text-xs font-black shadow-xl bg-indigo-600/90 backdrop-blur-sm text-white hover:bg-indigo-500 ring-2 ring-indigo-400/50 transition-all active:scale-95"
+              >
+                <Sparkles className="h-4 w-4" />
+                <span>Identificar por Foto (IA)</span>
+              </button>
+            )}
+            
             <button
               type="button"
               onClick={handleCaptureClick}
@@ -329,7 +358,7 @@ export const CameraScannerModal: React.FC<CameraScannerModalProps> = ({
               }`}
             >
               <Camera className="h-5 w-5" />
-              <span>{isCapturing ? 'Lendo Código...' : 'Capturar'}</span>
+              <span>{isCapturing ? 'Lendo Código...' : 'Capturar Manual'}</span>
             </button>
           </div>
 

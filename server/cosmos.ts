@@ -53,6 +53,7 @@ export async function fetchCosmosProduct(gtin: string): Promise<CosmosFetchRespo
         'User-Agent': userAgent,
         'Content-Type': 'application/json',
       },
+      signal: AbortSignal.timeout(4000), // Prevent hanging
     });
 
     if (response.status === 200) {
