@@ -1,3 +1,4 @@
+import { apiService } from '../../services/apiService';
 import React, { useState, useRef, useEffect } from 'react';
 import { MessageSquare, Send, X, Bot, User, Trash2, Sparkles, ChevronDown, Move } from 'lucide-react';
 
@@ -223,7 +224,7 @@ export const ChatAssistant: React.FC = () => {
         ? 'http://localhost:3000/api'
         : '/api';
 
-      const res = await fetch(`${baseUrl}/chat`, {
+      const res = await apiService.fetchWithAuth(`${baseUrl}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: userMessage.text, sessionId })

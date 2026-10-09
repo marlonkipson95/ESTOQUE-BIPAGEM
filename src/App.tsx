@@ -88,6 +88,17 @@ export default function App() {
     });
   }, []);
 
+  
+  useEffect(() => {
+    const handleAuthError = () => {
+      authService.logout();
+      setAuthSession({ isAuthenticated: false, user: null });
+      // We explicitly do NOT clear storageService here to preserve offline queues.
+    };
+    window.addEventListener('auth-error', handleAuthError);
+    return () => window.removeEventListener('auth-error', handleAuthError);
+  }, []);
+
   useEffect(() => {
     if (!authSession.isAuthenticated) return;
     refreshData();
@@ -276,6 +287,7 @@ export default function App() {
               onSelectProduct={p => setSelectedProduct(p)}
               onOpenNewProductWithCode={handleOpenNewProductWithCode}
               onOpenQuickScan={() => setIsCameraScannerOpen(true)}
+              onOpenPhotoScan={() => setIsPhotoScannerOpen(true)}
               externalScannedCode={incomingScannedCode}
               onClearExternalScannedCode={() => setIncomingScannedCode('')}
               externalVisionData={incomingVisionData}

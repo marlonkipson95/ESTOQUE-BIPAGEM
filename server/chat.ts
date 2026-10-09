@@ -186,12 +186,33 @@ async function searchProductDb(term: string): Promise<any[]> {
   }
 }
 
+import { processarMensagemGemini } from './chat_gemini.js';
+
 /**
  * Motor de interpretação de regras operacionais e consultas verídicas da Otto Diesel
  */
-export async function processChatMessage(message: string, sessionId: string): Promise<string> {
+export async function processChatMessage(message: string, sessionId: string, userId?: string, username?: string): Promise<string> {
   const cleanMsg = message.trim();
   const lower = cleanMsg.toLowerCase();
+
+  // =============================================================
+  // INTEGRAÇÃO GEMINI FUNCTION CALLING (PRIMEIRA FATIA)
+  // =============================================================
+  // Verifica se é uma intenção de consulta que o Gemini já domina
+  // Estamos protegendo comandos de escrita/orçamento ("confirmar", "altere") para caírem no legado
+  if (!lower.startsWith('altere') && !lower.startsWith('confirmar') && !lower.startsWith('sim')) {
+    try {
+      const geminiResponse = await processarMensagemGemini(message, userId);
+      // Se o Gemini retornou uma resposta satisfatória usando ferramentas, nós a utilizamos
+      if (geminiResponse) {
+        return geminiResponse;
+      }
+    } catch (err: any) {
+      console.warn('[Gemini Fallback] Falha no RAG:', err.message);
+      // Cai para o fluxo legado (regex)
+    }
+  }
+  // =============================================================
 
   // -------------------------------------------------------------
   // 0. TRATAMENTO DE ESTADO EM ESPERA (Ex: aguardando nome da lista)
@@ -220,16 +241,23 @@ export async function processChatMessage(message: string, sessionId: string): Pr
     }
 
     // A) Confirmação de Orçamento Pendente
-    const pendingBudget = pendingBudgets.get(sessionId);
-    if (pendingBudget) {
+    let pendingBudgetFromDb = null;
+    if (userId) {
+      const res = await pool.query('SELECT itens, total_orcamento, nome_cliente FROM orcamentos_pendentes WHERE user_id = $1', [userId]);
+      if (res.rows.length > 0) {
+        pendingBudgetFromDb = res.rows[0];
+      }
+    }
+    
+    if (pendingBudgetFromDb && pendingBudgetFromDb.itens.length > 0) {
       const client = await pool.connect();
       try {
-        const dbItens = pendingBudget.itens.map(item => ({
+        const dbItens = pendingBudgetFromDb.itens.map((item: any) => ({
           id: item.produto_id,
           codigo_atual: item.codigo,
-          codigo_fabrica: item.codigo_fabrica,
+          codigo_fabrica: item.codigo_fabrica || item.codigo,
           descricao: item.descricao,
-          locacao: item.locacao,
+          locacao: item.locacao || 'Sem locação',
           quantidade: item.quantidade,
           valor_unitario: item.preco_unitario,
           subtotal: item.subtotal,
@@ -238,17 +266,17 @@ export async function processChatMessage(message: string, sessionId: string): Pr
         const res = await client.query(
           `INSERT INTO orcamentos (nome_cliente, responsavel, itens, total_orcamento, criado_em, atualizado_em) 
            VALUES ($1, $2, $3, $4, NOW(), NOW()) RETURNING id, criado_em`,
-          [pendingBudget.nome_cliente, pendingBudget.vendedor, JSON.stringify(dbItens), pendingBudget.total_orcamento]
+          [pendingBudgetFromDb.nome_cliente || 'Cliente Padrão', username || 'Vendedor', JSON.stringify(dbItens), pendingBudgetFromDb.total_orcamento]
         );
 
         const savedId = res.rows[0]?.id || 'OK';
-        pendingBudgets.delete(sessionId);
+        await client.query('DELETE FROM orcamentos_pendentes WHERE user_id = $1', [userId]);
 
         return `✅ **Orçamento #${savedId} confirmado e gravado com sucesso!**\n\n` +
                `📅 **Data de geração:** ${formatDate()}\n` +
-               `👤 **Vendedor:** ${pendingBudget.vendedor}\n` +
-               `🏢 **Cliente:** ${pendingBudget.nome_cliente}\n` +
-               `💰 **Valor Total:** ${formatMoney(pendingBudget.total_orcamento)}\n\n` +
+               `👤 **Vendedor:** ${username || 'Vendedor'}\n` +
+               `🏢 **Cliente:** ${pendingBudgetFromDb.nome_cliente || 'Cliente Padrão'}\n` +
+               `💰 **Valor Total:** ${formatMoney(pendingBudgetFromDb.total_orcamento)}\n\n` +
                `Este orçamento já está salvo permanentemente no banco de dados e disponível na aba **Orçamentos** para visualização e impressão.`;
       } catch (err: any) {
         console.error('[Chat] Erro ao gravar orçamento:', err);
@@ -452,9 +480,19 @@ export async function processChatMessage(message: string, sessionId: string): Pr
   // -------------------------------------------------------------
   if (lower === 'cancelar' || lower === 'descartar' || lower === 'descartar lista') {
     let cancelled = false;
-    if (pendingBudgets.has(sessionId)) {
-      pendingBudgets.delete(sessionId);
-      cancelled = true;
+    if (userId) {
+      const pool = getDbPool();
+      if (pool) {
+        const client = await pool.connect();
+        try {
+          const res = await client.query('DELETE FROM orcamentos_pendentes WHERE user_id = $1 RETURNING user_id', [userId]);
+          if (res.rowCount && res.rowCount > 0) {
+            cancelled = true;
+          }
+        } finally {
+          client.release();
+        }
+      }
     }
     if (pendingProductUpdates.has(sessionId)) {
       pendingProductUpdates.delete(sessionId);
@@ -2122,7 +2160,9 @@ chatRouter.post('/', async (req: Request, res: Response) => {
   }
 
   try {
-    const responseText = await processChatMessage(message, sessionId);
+    const userId = req.user?.id?.toString();
+    const username = req.user?.username;
+    const responseText = await processChatMessage(message, sessionId, userId, username);
     return res.json({ response: responseText });
   } catch (error: any) {
     console.error('[Chat] Erro no processamento:', error);

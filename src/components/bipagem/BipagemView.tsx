@@ -35,6 +35,7 @@ interface BipagemViewProps {
   onSelectProduct: (product: Product) => void;
   onOpenNewProductWithCode: (code: string) => void;
   onOpenQuickScan: () => void;
+  onOpenPhotoScan: () => void;
   externalScannedCode?: string;
   onClearExternalScannedCode?: () => void;
   externalVisionData?: {
@@ -50,6 +51,7 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
   onSelectProduct,
   onOpenNewProductWithCode,
   onOpenQuickScan,
+  onOpenPhotoScan,
   externalScannedCode,
   onClearExternalScannedCode,
   externalVisionData,
@@ -959,9 +961,20 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
                 type="button"
                 onClick={onOpenQuickScan}
                 className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-5 py-3 sm:py-3 text-sm font-bold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition"
+                title="Bipar código de barras com a câmera"
               >
                 <Camera className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
                 <span>CÂMERA</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onOpenPhotoScan}
+                className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-xl border border-indigo-300 bg-indigo-50 px-5 py-3 sm:py-3 text-sm font-bold text-indigo-700 shadow-sm hover:bg-indigo-100 dark:border-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300 dark:hover:bg-indigo-800 transition"
+                title="Tirar foto da peça para identificar com Inteligência Artificial"
+              >
+                <Sparkles className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                <span>IA / FOTO</span>
               </button>
 
               {scanResult && (
