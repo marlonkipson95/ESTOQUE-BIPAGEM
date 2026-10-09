@@ -1,11 +1,35 @@
 import { Product, ProductCodeHistory, DashboardStats, DatabaseHealth, QuickList, QuickListItem } from '../types';
 
 class ApiService {
+  async fetchWithAuth(url: string, options: RequestInit = {}): Promise<Response> {
+    const session = localStorage.getItem('kipson_auth_session');
+    let token = '';
+    if (session) {
+      try {
+        const parsed = JSON.parse(session);
+        if (parsed.token) token = parsed.token;
+      } catch (e) {}
+    }
+    
+    const headers = { ...options.headers } as Record<string, string>;
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
+    const res = await this.fetchWithAuth(url, { ...options, headers });
+    
+    if (res.status === 401 && !url.includes('/health')) {
+      window.dispatchEvent(new CustomEvent('auth-error'));
+    }
+    
+    return res;
+  }
+
   private baseUrl = '/api';
 
   async getHealth(): Promise<DatabaseHealth> {
     try {
-      const res = await fetch(`${this.baseUrl}/health`);
+      const res = await this.fetchWithAuth(`${this.baseUrl}/health`);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
     } catch (err: any) {
@@ -18,7 +42,7 @@ class ApiService {
   }
 
   async getDashboardStats(): Promise<DashboardStats> {
-    const res = await fetch(`${this.baseUrl}/dashboard/stats`);
+    const res = await this.fetchWithAuth(`${this.baseUrl}/dashboard/stats`);
     if (!res.ok) throw new Error('Falha ao obter estatísticas');
     return await res.json();
   }
@@ -33,7 +57,7 @@ class ApiService {
     };
     message?: string;
   }> {
-    const res = await fetch(`${this.baseUrl}/vision/identify`, {
+    const res = await this.fetchWithAuth(`${this.baseUrl}/vision/identify`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ imageBase64 }),
@@ -59,7 +83,7 @@ class ApiService {
     newBarcode?: string;
     message?: string;
   }> {
-    const res = await fetch(`${this.baseUrl}/produtos/scan`, {
+    const res = await this.fetchWithAuth(`${this.baseUrl}/produtos/scan`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code }),
@@ -98,19 +122,19 @@ class ApiService {
     if (params.page) query.set('page', String(params.page));
     if (params.limit) query.set('limit', String(params.limit));
 
-    const res = await fetch(`${this.baseUrl}/produtos?${query.toString()}`);
+    const res = await this.fetchWithAuth(`${this.baseUrl}/produtos?${query.toString()}`);
     if (!res.ok) throw new Error('Falha ao listar produtos');
     return await res.json();
   }
 
   async getProduct(id: string): Promise<{ product: Product; history: ProductCodeHistory[] }> {
-    const res = await fetch(`${this.baseUrl}/produtos/${encodeURIComponent(id)}`);
+    const res = await this.fetchWithAuth(`${this.baseUrl}/produtos/${encodeURIComponent(id)}`);
     if (!res.ok) throw new Error('Produto não encontrado');
     return await res.json();
   }
 
   async createProduct(data: Partial<Product> & { descricao: string }): Promise<{ product: Product; isExisting?: boolean; message?: string }> {
-    const res = await fetch(`${this.baseUrl}/produtos`, {
+    const res = await this.fetchWithAuth(`${this.baseUrl}/produtos`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -125,7 +149,7 @@ class ApiService {
   }
 
   async updateProduct(id: string, data: Partial<Product>): Promise<{ product: Product; message: string }> {
-    const res = await fetch(`${this.baseUrl}/produtos/${encodeURIComponent(id)}`, {
+    const res = await this.fetchWithAuth(`${this.baseUrl}/produtos/${encodeURIComponent(id)}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -144,7 +168,7 @@ class ApiService {
     id: string,
     location: { corredor?: string; baia?: string; nivel?: string; locacao?: string; motivo?: string }
   ): Promise<{ product: Product; message: string }> {
-    const res = await fetch(`${this.baseUrl}/produtos/${encodeURIComponent(id)}/localizacao`, {
+    const res = await this.fetchWithAuth(`${this.baseUrl}/produtos/${encodeURIComponent(id)}/localizacao`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(location),
@@ -165,7 +189,7 @@ class ApiService {
     novo_codigo: string,
     motivo: string
   ): Promise<{ product: Product; message: string }> {
-    const res = await fetch(`${this.baseUrl}/produtos/${encodeURIComponent(id)}/codigo`, {
+    const res = await this.fetchWithAuth(`${this.baseUrl}/produtos/${encodeURIComponent(id)}/codigo`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ tipo, novo_codigo, motivo }),
@@ -186,7 +210,7 @@ class ApiService {
     tipo: 'codigo_barras' | 'codigo_produto' | 'codigo_fabrica' = 'codigo_barras',
     motivo: string = 'Código de barras adicional vinculado'
   ): Promise<{ success: boolean; product: Product; message: string }> {
-    const res = await fetch(`${this.baseUrl}/produtos/${encodeURIComponent(id)}/vincular-codigo`, {
+    const res = await this.fetchWithAuth(`${this.baseUrl}/produtos/${encodeURIComponent(id)}/vincular-codigo`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ codigo, tipo, motivo }),
@@ -204,7 +228,7 @@ class ApiService {
     id: string,
     motivo: string = 'Código de barras desvinculado manualmente'
   ): Promise<{ success: boolean; product: Product; message: string }> {
-    const res = await fetch(`${this.baseUrl}/produtos/${encodeURIComponent(id)}/desvincular-codigo-barras`, {
+    const res = await this.fetchWithAuth(`${this.baseUrl}/produtos/${encodeURIComponent(id)}/desvincular-codigo-barras`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ motivo }),
@@ -219,7 +243,7 @@ class ApiService {
   }
 
   async deleteProduct(id: string): Promise<{ success: boolean; message: string }> {
-    const res = await fetch(`${this.baseUrl}/produtos/${encodeURIComponent(id)}`, {
+    const res = await this.fetchWithAuth(`${this.baseUrl}/produtos/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     });
     if (!res.ok) {
@@ -233,7 +257,7 @@ class ApiService {
     id: string,
     data: { quantidade?: number; incremento?: number; motivo?: string; usuario?: string }
   ): Promise<{ product: Product; quantidade_anterior: number; quantidade_nova: number; message: string }> {
-    const res = await fetch(`${this.baseUrl}/produtos/${encodeURIComponent(id)}/estoque`, {
+    const res = await this.fetchWithAuth(`${this.baseUrl}/produtos/${encodeURIComponent(id)}/estoque`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -246,7 +270,7 @@ class ApiService {
   }
 
   async getRelatedProducts(id: string): Promise<{ relacionados: any[] }> {
-    const res = await fetch(`${this.baseUrl}/produtos/${encodeURIComponent(id)}/relacionados`);
+    const res = await this.fetchWithAuth(`${this.baseUrl}/produtos/${encodeURIComponent(id)}/relacionados`);
     if (!res.ok) throw new Error('Falha ao carregar produtos relacionados');
     return await res.json();
   }
@@ -260,7 +284,7 @@ class ApiService {
       ? { relacionado_id: params, motivo: motivoParam }
       : params;
 
-    const res = await fetch(`${this.baseUrl}/produtos/${encodeURIComponent(id)}/relacionados`, {
+    const res = await this.fetchWithAuth(`${this.baseUrl}/produtos/${encodeURIComponent(id)}/relacionados`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -273,7 +297,7 @@ class ApiService {
   }
 
   async removeRelatedProduct(id: string, relacionadoId: string): Promise<{ success: boolean; message: string }> {
-    const res = await fetch(`${this.baseUrl}/produtos/${encodeURIComponent(id)}/relacionados/${encodeURIComponent(relacionadoId)}`, {
+    const res = await this.fetchWithAuth(`${this.baseUrl}/produtos/${encodeURIComponent(id)}/relacionados/${encodeURIComponent(relacionadoId)}`, {
       method: 'DELETE',
     });
     if (!res.ok) {
@@ -287,7 +311,7 @@ class ApiService {
     items: any[];
     summary: { total: number; novos: number; semAlteracao: number; comAlteracao: number };
   }> {
-    const res = await fetch(`${this.baseUrl}/importar/comparar`, {
+    const res = await this.fetchWithAuth(`${this.baseUrl}/importar/comparar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ items }),
@@ -305,7 +329,7 @@ class ApiService {
     preserveExistingLocation?: boolean;
     archiveOldBarcodesInHistory?: boolean;
   }): Promise<{ total: number; novos: number; atualizados: number; erros: number }> {
-    const res = await fetch(`${this.baseUrl}/importar`, {
+    const res = await this.fetchWithAuth(`${this.baseUrl}/importar`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -350,7 +374,7 @@ class ApiService {
 
     for (const item of queue) {
       try {
-        const res = await fetch(`${this.baseUrl}/orcamentos`, {
+        const res = await this.fetchWithAuth(`${this.baseUrl}/orcamentos`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(item),
@@ -372,7 +396,7 @@ class ApiService {
   async getOrcamentos(): Promise<import('../types').Orcamento[]> {
     const offlineItems = this.getOfflineOrcamentosQueue();
     try {
-      const res = await fetch(`${this.baseUrl}/orcamentos`);
+      const res = await this.fetchWithAuth(`${this.baseUrl}/orcamentos`);
       if (res.ok) {
         const serverItems: import('../types').Orcamento[] = await res.json();
         // Sincronizar itens pendentes em background se houver
@@ -411,7 +435,7 @@ class ApiService {
     }
 
     try {
-      const res = await fetch(`${this.baseUrl}/orcamentos`, {
+      const res = await this.fetchWithAuth(`${this.baseUrl}/orcamentos`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(orcamento),
@@ -439,7 +463,7 @@ class ApiService {
 
     if (navigator.onLine) {
       try {
-        const res = await fetch(`${this.baseUrl}/orcamentos/${id}`, {
+        const res = await this.fetchWithAuth(`${this.baseUrl}/orcamentos/${id}`, {
           method: 'DELETE',
         });
         if (!res.ok) {
@@ -458,14 +482,14 @@ class ApiService {
 
   async getAuditoria(search?: string): Promise<import('../types').AuditoriaRecord[]> {
     const query = search ? `?search=${encodeURIComponent(search)}` : '';
-    const res = await fetch(`${this.baseUrl}/auditoria${query}`);
+    const res = await this.fetchWithAuth(`${this.baseUrl}/auditoria${query}`);
     if (!res.ok) throw new Error('Falha ao carregar registros de auditoria');
     const data = await res.json();
     return data.registros || [];
   }
 
   async reverterAuditoria(id: number, usuario: string = 'Programador / Admin'): Promise<{ success: boolean; message: string }> {
-    const res = await fetch(`${this.baseUrl}/auditoria/reverter/${id}`, {
+    const res = await this.fetchWithAuth(`${this.baseUrl}/auditoria/reverter/${id}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ usuario }),
@@ -495,7 +519,7 @@ class ApiService {
   }> {
     try {
       const clean = (gtin || '').trim().replace(/[\s\.-]/g, '');
-      const res = await fetch(`${this.baseUrl}/cosmos/gtin/${encodeURIComponent(clean)}`, {
+      const res = await this.fetchWithAuth(`${this.baseUrl}/cosmos/gtin/${encodeURIComponent(clean)}`, {
         signal: AbortSignal.timeout(6000), // Prevent infinite hang
       });
       const data = await res.json();
@@ -516,7 +540,7 @@ class ApiService {
 
   async getListasRapidas(): Promise<QuickList[]> {
     try {
-      const res = await fetch(`${this.baseUrl}/listas-rapidas`);
+      const res = await this.fetchWithAuth(`${this.baseUrl}/listas-rapidas`);
       if (!res.ok) throw new Error('Falha ao carregar listas rápidas');
       return await res.json();
     } catch (err: any) {
@@ -527,7 +551,7 @@ class ApiService {
 
   async getListaRapidaById(id: number): Promise<QuickList | null> {
     try {
-      const res = await fetch(`${this.baseUrl}/listas-rapidas/${id}`);
+      const res = await this.fetchWithAuth(`${this.baseUrl}/listas-rapidas/${id}`);
       if (!res.ok) throw new Error('Lista não encontrada');
       return await res.json();
     } catch (err: any) {
@@ -538,7 +562,7 @@ class ApiService {
 
   async salvarListaRapida(lista: Partial<QuickList>): Promise<{ success: boolean; lista?: QuickList; error?: string }> {
     try {
-      const res = await fetch(`${this.baseUrl}/listas-rapidas`, {
+      const res = await this.fetchWithAuth(`${this.baseUrl}/listas-rapidas`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(lista),
@@ -555,7 +579,7 @@ class ApiService {
 
   async excluirListaRapida(id: number): Promise<{ success: boolean; error?: string }> {
     try {
-      const res = await fetch(`${this.baseUrl}/listas-rapidas/${id}`, {
+      const res = await this.fetchWithAuth(`${this.baseUrl}/listas-rapidas/${id}`, {
         method: 'DELETE',
       });
       if (!res.ok) {
@@ -577,7 +601,7 @@ class ApiService {
   }> {
     try {
       const clean = encodeURIComponent((code || '').trim());
-      const res = await fetch(`${this.baseUrl}/listas-rapidas/lookup-item/${clean}`);
+      const res = await this.fetchWithAuth(`${this.baseUrl}/listas-rapidas/lookup-item/${clean}`);
       if (!res.ok) return { found: false };
       return await res.json();
     } catch {

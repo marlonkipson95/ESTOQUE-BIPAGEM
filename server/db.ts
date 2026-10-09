@@ -200,6 +200,18 @@ export async function initDatabaseSchema(): Promise<void> {
       );
     `);
 
+    // 6. Tabela orcamentos_pendentes (Memória persistente do carrinho do chat)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS orcamentos_pendentes (
+        user_id INTEGER PRIMARY KEY REFERENCES usuarios(id) ON DELETE CASCADE,
+        nome_cliente VARCHAR(150),
+        itens JSONB NOT NULL DEFAULT '[]'::jsonb,
+        total_orcamento DECIMAL(10,2) DEFAULT 0.00,
+        criado_em TIMESTAMPTZ DEFAULT NOW(),
+        atualizado_em TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
     // 6. Tabela usuarios (Controle de Acesso e Gerenciamento de Operadores)
     await client.query(`
       CREATE TABLE IF NOT EXISTS usuarios (
@@ -230,11 +242,13 @@ export async function initDatabaseSchema(): Promise<void> {
     `);
 
     // Inserir usuário padrão solicitado (estoque / controle12) se não existir
+    const { hashSync } = await import('bcryptjs');
+    const defaultHash = hashSync('controle12', 10);
     await client.query(`
       INSERT INTO usuarios (username, password, nome, cargo, ativo)
-      VALUES ('estoque', 'controle12', 'Operador de Estoque', 'Administrador', true)
+      VALUES ($1, $2, $3, $4, $5)
       ON CONFLICT (username) DO NOTHING;
-    `);
+    `, ['estoque', defaultHash, 'Operador de Estoque', 'Administrador', true]);
 
     // 6b. Tabela orcamentos (Orçamentos salvos)
     await client.query(`
@@ -259,6 +273,17 @@ export async function initDatabaseSchema(): Promise<void> {
         total_itens INTEGER DEFAULT 0,
         criado_em TIMESTAMPTZ DEFAULT NOW(),
         atualizado_em TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+
+    // 6d. Tabela api_quotas (Controle persistente de cotas de APIs externas como Gemini Vision)
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS api_quotas (
+        service VARCHAR(50) NOT NULL,
+        data_referencia DATE NOT NULL DEFAULT CURRENT_DATE,
+        requisicoes INTEGER NOT NULL DEFAULT 0,
+        atualizado_em TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (service, data_referencia)
       );
     `);
 

@@ -19,6 +19,23 @@ import {
   DEFAULT_SETTINGS
 } from '../data/mockDatabase';
 
+export type SyncOperationType = 
+  | 'UPDATE_STOCK'
+  | 'UPDATE_LOCATION'
+  | 'CREATE_PRODUCT'
+  | 'UPDATE_PRODUCT'
+  | 'DELETE_PRODUCT'
+  | 'LINK_CODE'
+  | 'UNLINK_CODE';
+
+export interface SyncQueueItem {
+  id: string;
+  type: SyncOperationType;
+  payload: any;
+  timestamp: string;
+  retryCount: number;
+}
+
 const STORAGE_KEYS = {
   PRODUCTS: 'kipson_products_v1',
   CODE_HISTORY: 'kipson_code_history_v1',
@@ -26,13 +43,27 @@ const STORAGE_KEYS = {
   IMPORT_BATCHES: 'kipson_import_batches_v1',
   IMPORT_PROFILES: 'kipson_import_profiles_v1',
   SETTINGS: 'kipson_settings_v1',
+  SYNC_QUEUE: 'kipson_sync_queue_v1',
 };
 
 class StorageService {
   private inMemoryProducts: Product[] | null = null;
+  private isProcessingSync = false;
 
   constructor() {
     this.cleanupLegacyFictitiousData();
+    this.setupNetworkListeners();
+  }
+
+  private setupNetworkListeners(): void {
+    if (typeof window !== 'undefined') {
+      window.addEventListener('online', () => {
+        console.log('[StorageService] 🌐 Conexão de rede restabelecida! Processando fila offline...');
+        this.processPendingSyncQueue().catch(err => {
+          console.warn('[StorageService] Erro ao processar fila offline pós-reconexão:', err.message);
+        });
+      });
+    }
   }
 
   // Limpa resquícios de produtos e movimentações fictícias que possam ter ficado no localStorage
@@ -567,7 +598,13 @@ class StorageService {
     });
 
     apiService.vincularCodigo(productId, cleanCode, 'codigo_barras', motivo).catch(err => {
-      console.warn('[StorageService] Vínculo de código no backend adiado:', err.message);
+      console.warn('[StorageService] Vínculo de código no backend adiado, enfileirado na Sync Queue:', err.message);
+      this.enqueueSync('LINK_CODE', {
+        productId,
+        codigo: cleanCode,
+        tipo: 'codigo_barras',
+        motivo
+      });
     });
 
     return { success: true, product: currentProduct, message: 'Código de barras vinculado com sucesso!' };
@@ -621,7 +658,8 @@ class StorageService {
     });
 
     apiService.desvincularCodigoBarras(productId, motivo).catch(err => {
-      console.warn('[StorageService] Desvinculação remota no PostgreSQL adiada:', err.message);
+      console.warn('[StorageService] Desvinculação remota no PostgreSQL adiada, enfileirada na Sync Queue:', err.message);
+      this.enqueueSync('UNLINK_CODE', { productId, motivo });
     });
 
     return { success: true, product: currentProduct, message: 'Código de barras desvinculado com sucesso!' };
@@ -715,7 +753,8 @@ class StorageService {
 
         // Sincronizar edição no banco PostgreSQL em segundo plano
         apiService.updateProduct(existing.id, updated).catch(err => {
-          console.warn('[StorageService] Atualização no backend PostgreSQL adiada:', err.message);
+          console.warn('[StorageService] Atualização no backend PostgreSQL adiada, enfileirada na Sync Queue:', err.message);
+          this.enqueueSync('UPDATE_PRODUCT', { productId: existing.id, data: updated });
         });
 
         return updated;
@@ -856,7 +895,8 @@ class StorageService {
 
     // Sincronizar novo produto com o banco PostgreSQL
     apiService.createProduct(newProduct).catch(err => {
-      console.warn('[StorageService] Cadastro no backend PostgreSQL adiado:', err.message);
+      console.warn('[StorageService] Cadastro no backend PostgreSQL adiado, enfileirado na Sync Queue:', err.message);
+      this.enqueueSync('CREATE_PRODUCT', newProduct);
     });
 
     return newProduct;
@@ -897,7 +937,15 @@ class StorageService {
       motivo: notes || `Recebimento de mercadoria (+${receivedQuantity})`,
       usuario: 'Operador Recebimento',
     }).catch(err => {
-      console.warn('[StorageService] Sincronização de recebimento com backend adiada:', err.message);
+      console.warn('[StorageService] Sincronização de recebimento com backend adiada, enfileirada na Sync Queue:', err.message);
+      this.enqueueSync('UPDATE_STOCK', {
+        productId,
+        data: {
+          quantidade: newQty,
+          motivo: notes || `Recebimento de mercadoria (+${receivedQuantity})`,
+          usuario: 'Operador Recebimento',
+        }
+      });
     });
 
     return { success: true, product };
@@ -968,7 +1016,17 @@ class StorageService {
       locacao: finalLoc,
       motivo: locationData.motivo,
     }).catch(err => {
-      console.warn('[StorageService] Sincronização de localização com backend adiada:', err.message);
+      console.warn('[StorageService] Sincronização de localização com backend adiada, enfileirada na Sync Queue:', err.message);
+      this.enqueueSync('UPDATE_LOCATION', {
+        productId,
+        data: {
+          corredor: finalCorredor,
+          baia: finalBaia,
+          nivel: finalNivel,
+          locacao: finalLoc,
+          motivo: locationData.motivo,
+        }
+      });
     });
 
     return { success: true, product: updatedProduct };
@@ -993,7 +1051,8 @@ class StorageService {
     try {
       await apiService.deleteProduct(productId);
     } catch (err: any) {
-      console.warn('[StorageService] Falha ao sincronizar exclusão com o backend:', err.message);
+      console.warn('[StorageService] Falha ao sincronizar exclusão com o backend, enfileirada na Sync Queue:', err.message);
+      this.enqueueSync('DELETE_PRODUCT', { productId });
     }
 
     return { success: true };
@@ -1040,7 +1099,15 @@ class StorageService {
       motivo,
       usuario,
     }).catch(err => {
-      console.warn('[StorageService] Sincronização de estoque com backend adiada:', err.message);
+      console.warn('[StorageService] Sincronização de estoque com backend adiada, enfileirada na Sync Queue:', err.message);
+      this.enqueueSync('UPDATE_STOCK', {
+        productId,
+        data: {
+          quantidade: newQty,
+          motivo,
+          usuario,
+        }
+      });
     });
 
     return { success: true, product: prod };
@@ -1081,13 +1148,180 @@ class StorageService {
     return { consolidated };
   }
 
+  // --- Sync Queue (Offline-First Resiliente) ---
+  getPendingSyncQueue(): SyncQueueItem[] {
+    return this.get<SyncQueueItem[]>(STORAGE_KEYS.SYNC_QUEUE, []);
+  }
+
+  getPendingSyncCount(): number {
+    return this.getPendingSyncQueue().length;
+  }
+
+  clearSyncQueue(): void {
+    this.set(STORAGE_KEYS.SYNC_QUEUE, []);
+    this.notifySyncQueueUpdated(0);
+  }
+
+  enqueueSync(type: SyncOperationType, payload: any): void {
+    const queue = this.getPendingSyncQueue();
+    const item: SyncQueueItem = {
+      id: `sync_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+      type,
+      payload,
+      timestamp: new Date().toISOString(),
+      retryCount: 0,
+    };
+    queue.push(item);
+    this.set(STORAGE_KEYS.SYNC_QUEUE, queue);
+    this.notifySyncQueueUpdated(queue.length);
+
+    // Tentar processar imediatamente se o dispositivo estiver online
+    if (typeof navigator !== 'undefined' && navigator.onLine) {
+      this.processPendingSyncQueue().catch(() => {});
+    }
+  }
+
+  private notifySyncQueueUpdated(count: number): void {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('kipson-sync-queue-updated', { detail: { count } }));
+    }
+  }
+
+  async processPendingSyncQueue(): Promise<{ processed: number; remaining: number; errors: number }> {
+    if (this.isProcessingSync) {
+      return { processed: 0, remaining: this.getPendingSyncCount(), errors: 0 };
+    }
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return { processed: 0, remaining: this.getPendingSyncCount(), errors: 0 };
+    }
+
+    this.isProcessingSync = true;
+    let processed = 0;
+    let errors = 0;
+
+    try {
+      const queue = this.getPendingSyncQueue();
+      if (queue.length === 0) {
+        this.isProcessingSync = false;
+        return { processed: 0, remaining: 0, errors: 0 };
+      }
+
+      const remainingQueue: SyncQueueItem[] = [];
+
+      for (let i = 0; i < queue.length; i++) {
+        const item = queue[i];
+        try {
+          switch (item.type) {
+            case 'UPDATE_STOCK':
+              await apiService.updateStock(item.payload.productId, item.payload.data);
+              processed++;
+              break;
+            case 'UPDATE_LOCATION':
+              await apiService.updateLocation(item.payload.productId, item.payload.data);
+              processed++;
+              break;
+            case 'CREATE_PRODUCT':
+              await apiService.createProduct(item.payload);
+              processed++;
+              break;
+            case 'UPDATE_PRODUCT':
+              await apiService.updateProduct(item.payload.productId, item.payload.data);
+              processed++;
+              break;
+            case 'DELETE_PRODUCT':
+              await apiService.deleteProduct(item.payload.productId);
+              processed++;
+              break;
+            case 'LINK_CODE':
+              await apiService.vincularCodigo(
+                item.payload.productId,
+                item.payload.codigo,
+                item.payload.tipo,
+                item.payload.motivo
+              );
+              processed++;
+              break;
+            case 'UNLINK_CODE':
+              await apiService.desvincularCodigoBarras(item.payload.productId, item.payload.motivo);
+              processed++;
+              break;
+            default:
+              processed++;
+              break;
+          }
+        } catch (err: any) {
+          errors++;
+          const isNetworkError =
+            (typeof navigator !== 'undefined' && !navigator.onLine) ||
+            err?.message?.includes('Failed to fetch') ||
+            err?.message?.includes('Network') ||
+            err?.message?.includes('ERR_CONNECTION') ||
+            err?.status === 0;
+
+          if (isNetworkError) {
+            // Em falha de rede/offline, re-enfileira os itens restantes para quando a rede retornar
+            remainingQueue.push(item);
+            remainingQueue.push(...queue.slice(i + 1));
+            break;
+          }
+
+          // Se for erro permanente ou conflito (4xx), permite até 3 retentativas
+          item.retryCount = (item.retryCount || 0) + 1;
+          if (item.retryCount < 3) {
+            remainingQueue.push(item);
+          } else {
+            console.warn(`[StorageService] Operação descartada após 3 falhas (${item.type}):`, err?.message);
+          }
+        }
+      }
+
+      this.set(STORAGE_KEYS.SYNC_QUEUE, remainingQueue);
+      this.notifySyncQueueUpdated(remainingQueue.length);
+      return { processed, remaining: remainingQueue.length, errors };
+    } finally {
+      this.isProcessingSync = false;
+    }
+  }
+
   // --- Synchronization with Neon PostgreSQL backend ---
   async syncWithBackend(): Promise<{ synced: boolean; count: number; error?: string }> {
     try {
+      // 1. Processar pendências locais acumuladas antes de ler do backend
+      await this.processPendingSyncQueue();
+
       const res = await apiService.getProducts({ limit: 50000 });
       if (res && Array.isArray(res.products)) {
-        this.saveProducts(res.products);
-        return { synced: true, count: res.total ?? res.products.length };
+        const pendingQueue = this.getPendingSyncQueue();
+
+        if (pendingQueue.length === 0) {
+          // Sem operações pendentes: base remota limpa sincronizada
+          this.saveProducts(res.products);
+          return { synced: true, count: res.total ?? res.products.length };
+        }
+
+        // Se ainda restam pendências offline, mesclar preservando os produtos locais alterados
+        const pendingProdIds = new Set(
+          pendingQueue.map(q => q.payload?.productId || q.payload?.id).filter(Boolean)
+        );
+
+        const localProducts = this.getProducts();
+        const mergedProducts = res.products.map(remoteProd => {
+          if (pendingProdIds.has(remoteProd.id)) {
+            const local = localProducts.find(p => p.id === remoteProd.id);
+            return local || remoteProd;
+          }
+          return remoteProd;
+        });
+
+        // Preservar novos produtos criados offline que ainda não subiram para o backend
+        for (const local of localProducts) {
+          if (pendingProdIds.has(local.id) && !mergedProducts.some(m => m.id === local.id)) {
+            mergedProducts.unshift(local);
+          }
+        }
+
+        this.saveProducts(mergedProducts);
+        return { synced: true, count: mergedProducts.length };
       }
       return { synced: false, count: 0 };
     } catch (err: any) {

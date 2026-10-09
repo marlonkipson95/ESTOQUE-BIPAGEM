@@ -137,7 +137,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const loadAudit = async () => {
     setIsLoadingAudit(true);
     try {
-      const res = await fetch(`/api/produtos/${currentProduct.id}/historico`);
+      const res = await apiService.fetchWithAuth(`/api/produtos/${currentProduct.id}/historico`);
       if (res.ok) {
         const data = await res.json();
         setAuditLog(data);
@@ -152,7 +152,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
   const handleRollback = async (historicoId: number) => {
     if (!window.confirm('Tem certeza que deseja desfazer essa alteração?')) return;
     try {
-      const res = await fetch(`/api/produtos/${currentProduct.id}/rollback/${historicoId}`, {
+      const res = await apiService.fetchWithAuth(`/api/produtos/${currentProduct.id}/rollback/${historicoId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ usuario: 'Operador Almoxarifado' })

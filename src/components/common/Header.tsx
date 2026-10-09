@@ -11,11 +11,14 @@ import {
   LogOut,
   Shield,
   Database,
+  CloudUpload,
+  RefreshCw,
 } from 'lucide-react';
 import { AppModule, SystemUser } from '../../types';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus';
 import { usePWAInstall } from '../../hooks/usePWAInstall';
 import { apiService } from '../../services/apiService';
+import { storageService } from '../../services/storageService';
 
 interface HeaderProps {
   activeModule: AppModule;
@@ -54,6 +57,33 @@ export const Header: React.FC<HeaderProps> = ({
   const { isInstallable, install } = usePWAInstall();
   const info = MODULE_NAMES[activeModule] || { title: 'KipStock', subtitle: '' };
   const [dbStatus, setDbStatus] = useState<'connected' | 'checking' | 'disconnected'>('checking');
+  const [pendingSyncCount, setPendingSyncCount] = useState<number>(0);
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
+
+  useEffect(() => {
+    // Carregar contagem inicial de pendências offline
+    setPendingSyncCount(storageService.getPendingSyncCount());
+
+    const handleSyncUpdate = (e: any) => {
+      setPendingSyncCount(e.detail?.count ?? storageService.getPendingSyncCount());
+    };
+
+    window.addEventListener('kipson-sync-queue-updated', handleSyncUpdate);
+    return () => {
+      window.removeEventListener('kipson-sync-queue-updated', handleSyncUpdate);
+    };
+  }, []);
+
+  const handleManualSync = async () => {
+    if (isSyncing) return;
+    setIsSyncing(true);
+    try {
+      await storageService.processPendingSyncQueue();
+      setPendingSyncCount(storageService.getPendingSyncCount());
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -137,6 +167,20 @@ export const Header: React.FC<HeaderProps> = ({
             </>
           )}
         </div>
+
+        {/* Offline Sync Queue Indicator */}
+        {pendingSyncCount > 0 && (
+          <button
+            type="button"
+            onClick={handleManualSync}
+            disabled={isSyncing}
+            className="flex items-center gap-1.5 rounded-full bg-amber-500 text-white dark:bg-amber-600 px-2.5 py-1 text-xs font-bold hover:bg-amber-600 transition shadow-sm animate-pulse"
+            title={`${pendingSyncCount} alteração(ões) offline aguardando sincronização com o banco de dados. Clique para enviar agora.`}
+          >
+            <CloudUpload className={`h-3.5 w-3.5 ${isSyncing ? 'animate-bounce' : ''}`} />
+            <span>{pendingSyncCount} {pendingSyncCount === 1 ? 'pendência' : 'pendências'}</span>
+          </button>
+        )}
 
         {/* User profile pill */}
         {currentUser && (
