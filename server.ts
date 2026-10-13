@@ -29,6 +29,17 @@ async function startServer() {
   app.use(express.json({ limit: '15mb' }));
   app.use(express.urlencoded({ extended: true, limit: '15mb' }));
 
+  // Logger HTTP para rastrear requisições do frontend
+  app.use((req, res, next) => {
+    const start = Date.now();
+    res.on('finish', () => {
+      if (req.originalUrl.startsWith('/api')) {
+        console.log(`[HTTP] ${req.method} ${req.originalUrl} -> ${res.statusCode} (${Date.now() - start}ms)`);
+      }
+    });
+    next();
+  });
+
   // Inicializar Schema no Neon PostgreSQL
   try {
     await initDatabaseSchema();
