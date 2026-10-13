@@ -14,6 +14,7 @@ import {
   Calculator,
   ShieldCheck,
   ClipboardList,
+  Camera,
 } from 'lucide-react';
 import { AppModule, SystemUser } from '../../types';
 

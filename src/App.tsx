@@ -178,7 +178,7 @@ export default function App() {
         setIsPhotoScannerOpen(false);
         setIsVisionResultOpen(true);
       } else {
-        alert('Erro ao identificar mercadoria pela foto: ' + (res.error || 'Erro desconhecido.'));
+        alert('Erro ao identificar mercadoria pela foto: ' + (res.message || 'Erro desconhecido.'));
       }
     } catch (err: any) {
       alert('Erro na comunicação com a API de visão.');

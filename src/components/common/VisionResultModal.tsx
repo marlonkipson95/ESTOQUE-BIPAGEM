@@ -28,7 +28,7 @@ export const VisionResultModal: React.FC<VisionResultModalProps> = ({
   useEffect(() => {
     if (isOpen && visionData) {
       setFormData({
-        codigo: visionData.codigo_sugerido || '',
+        codigo: visionData.codigo_barras || visionData.codigo_fabrica || visionData.codigo_sugerido || '',
         descricao: visionData.descricao_sugerida || '',
         locacao: '',
         quantidade: typeof visionData.quantidade_detectada === 'number' ? visionData.quantidade_detectada : 1,
@@ -53,26 +53,17 @@ export const VisionResultModal: React.FC<VisionResultModalProps> = ({
     }
 
     try {
-      const codeType = storageService.determineCodeType(formData.codigo);
-      
-      // Salvar produto
-      const produto = storageService.saveProduct({
-        codigo: formData.codigo,
-        descricao: formData.descricao || 'PRODUTO IA',
-        locacao: formData.locacao,
-        saldo: formData.quantidade,
-        tipoCodigo: codeType,
-      });
+      const cleanCode = formData.codigo.trim();
+      const isBarcode = /^\d{8,14}$/.test(cleanCode.replace(/[\s\.-]/g, ''));
 
-      // Registrar histórico (bipagem)
-      storageService.saveCodeHistory({
-        codigo: formData.codigo,
-        descricao_produto: produto.descricao,
-        locacao_produto: produto.locacao,
-        status_leitura: 'valido',
-        tipo_codigo: codeType,
-        usuario: currentUser,
-        quantidade_lida: formData.quantidade,
+      // Salvar produto
+      storageService.saveProduct({
+        codigo_barras_atual: isBarcode ? cleanCode : (visionData.codigo_barras || ''),
+        codigo_atual: !isBarcode ? cleanCode : '',
+        codigo_fabrica: visionData.codigo_fabrica || '',
+        descricao: formData.descricao || 'PRODUTO IDENTIFICADO POR IA',
+        locacao: formData.locacao,
+        quantidade: formData.quantidade,
       });
 
       beepService.playSuccess();

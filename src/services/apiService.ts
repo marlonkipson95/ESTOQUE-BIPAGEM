@@ -16,7 +16,7 @@ class ApiService {
       headers['Authorization'] = `Bearer ${token}`;
     }
     
-    const res = await this.fetchWithAuth(url, { ...options, headers });
+    const res = await fetch(url, { ...options, headers });
     
     if (res.status === 401 && !url.includes('/health')) {
       window.dispatchEvent(new CustomEvent('auth-error'));

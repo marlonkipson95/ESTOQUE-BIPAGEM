@@ -241,14 +241,28 @@ export async function initDatabaseSchema(): Promise<void> {
       ADD COLUMN IF NOT EXISTS perm_alterar_desc BOOLEAN DEFAULT TRUE;
     `);
 
-    // Inserir usuário padrão solicitado (estoque / controle12) se não existir
+    // Inserir usuários padrão solicitados se não existirem
     const { hashSync } = await import('bcryptjs');
-    const defaultHash = hashSync('controle12', 10);
+    const estoqueHash = hashSync('controle12', 10);
     await client.query(`
       INSERT INTO usuarios (username, password, nome, cargo, ativo)
       VALUES ($1, $2, $3, $4, $5)
       ON CONFLICT (username) DO NOTHING;
-    `, ['estoque', defaultHash, 'Operador de Estoque', 'Administrador', true]);
+    `, ['estoque', estoqueHash, 'Operador de Estoque', 'Administrador', true]);
+
+    const kipsonHash = hashSync('kipson2024', 10);
+    await client.query(`
+      INSERT INTO usuarios (username, password, nome, cargo, ativo)
+      VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (username) DO NOTHING;
+    `, ['kipson', kipsonHash, 'Administrador Geral', 'Administrador', true]);
+
+    const vendedorHash = hashSync('senha-vendedor', 10);
+    await client.query(`
+      INSERT INTO usuarios (username, password, nome, cargo, ativo)
+      VALUES ($1, $2, $3, $4, $5)
+      ON CONFLICT (username) DO NOTHING;
+    `, ['vendedor', vendedorHash, 'Vendedor Balcão', 'Vendedor', true]);
 
     // 6b. Tabela orcamentos (Orçamentos salvos)
     await client.query(`
