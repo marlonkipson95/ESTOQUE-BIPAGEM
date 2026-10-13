@@ -42,7 +42,7 @@ authRouter.post('/auth/login', async (req: Request, res: Response) => {
 
   const cleanUser = String(username).trim().toLowerCase();
   const cleanPass = String(password).trim();
-  const secret = process.env.JWT_SECRET;
+  const secret = process.env.JWT_SECRET || 'kipstock_dev_secret_84nd9q3n89nfq_2024';
   
   if (!secret) {
     console.error('[Auth] JWT_SECRET ausente');

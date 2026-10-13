@@ -5,9 +5,11 @@ const { Pool } = pg;
 let pool: pg.Pool | null = null;
 let isConnected = false;
 
+const DEFAULT_DATABASE_URL = 'postgresql://neondb_owner:npg_NQIsqwXo03nM@ep-odd-surf-acyeqhiu-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require';
+
 // Initialize PostgreSQL connection pool with SSL configured for Neon
 export function getDbPool(): pg.Pool | null {
-  const connectionString = process.env.DATABASE_URL;
+  const connectionString = process.env.DATABASE_URL || DEFAULT_DATABASE_URL;
   if (!connectionString) {
     return null;
   }
