@@ -151,14 +151,19 @@ async function searchProductDb(term: string): Promise<any[]> {
   const pool = getDbPool();
   if (!pool) return [];
 
-  const clean = term.trim();
+  const clean = term.trim().replace(/[?!.,;]/g, '');
   if (!clean) return [];
 
   const client = await pool.connect();
   try {
     const res = await client.query(
       `SELECT id, codigo_atual, codigo_fabrica, codigo_barras_atual, descricao,
-              quantidade, corredor, baia, nivel, locacao,
+              quantidade, 
+              COALESCE(estoque_fisico, 0) as estoque_fisico,
+              COALESCE(ncm, '') as ncm,
+              COALESCE(ultima_data_compra, '') as ultima_data_compra,
+              COALESCE(ultima_data_venda, '') as ultima_data_venda,
+              corredor, baia, nivel, locacao,
               preco_sugerido, preco_minimo, preco_tabela, custo_unitario, codigos_alternativos
        FROM produtos 
        WHERE UPPER(codigo_atual) = UPPER($1)
@@ -2079,12 +2084,18 @@ export async function processChatMessage(message: string, sessionId: string, use
     const precoSug = p.preco_sugerido ? formatMoney(parseFloat(p.preco_sugerido)) : 'Não informado';
     const precoTab = p.preco_tabela ? formatMoney(parseFloat(p.preco_tabela)) : 'Não informado';
 
-    return `🔍 **Dados do Produto Localizado no Banco:**\n\n` +
+    return `🔍 **Dados Oficiais do Produto Localizado no Banco:**\n\n` +
            `* **Código Interno:** \`${p.codigo_atual}\`\n` +
            `* **Código de Fábrica:** \`${p.codigo_fabrica || '—'}\`\n` +
+           `* **Código de Barras:** \`${p.codigo_barras_atual || '—'}\`\n` +
            `* **Descrição:** ${p.descricao}\n` +
+           `* **NCM:** \`${p.ncm || 'Não cadastrado'}\`\n` +
+           `* **📊 Estoque Contábil:** **${p.quantidade || 0}** unidades\n` +
+           `* **📦 Estoque Físico:** **${p.estoque_fisico || 0}** unidades\n` +
+           `* **Diferença de Estoque:** **${(p.estoque_fisico || 0) - (p.quantidade || 0)}** unidades\n` +
+           `* **📅 Data de Última Compra:** ${p.ultima_data_compra || 'Não informada'}\n` +
+           (p.ultima_data_venda ? `* **📅 Data de Última Venda:** ${p.ultima_data_venda}\n` : '') +
            `* **📍 Locação Física:** **Corredor ${p.corredor || '—'}, Baia ${p.baia || '—'}, Nível ${p.nivel || '—'}** (\`${locStr}\`)\n` +
-           `* **📦 Estoque Físico:** **${p.quantidade}** unidades\n` +
            `* **💵 Preços:** Mínimo: **${precoMin}** | Sugerido: **${precoSug}** | Tabela: **${precoTab}**\n` +
            (p.codigos_alternativos ? `* **Códigos Alternativos/Genéricos:** ${p.codigos_alternativos}\n` : '') +
            `\nSe desejar gerar uma prévia de orçamento para este item, basta solicitar:\n` +

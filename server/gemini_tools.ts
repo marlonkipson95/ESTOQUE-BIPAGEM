@@ -1,5 +1,4 @@
 import { getDbPool } from './db.js';
-
 import { Type } from '@google/genai';
 
 // ==========================================
@@ -8,13 +7,13 @@ import { Type } from '@google/genai';
 
 export const toolConsultarProdutoPorCodigo = {
   name: 'consultar_produto_por_codigo',
-  description: 'Consulta um produto no banco de dados através do seu código exato (interno ou de fábrica). Use para buscar informações precisas de estoque, preço e localização quando o usuário perguntar sobre um código específico.',
+  description: 'Consulta um produto no banco de dados através do seu código exato (código interno, de fábrica ou de barras). Retorna estoque contábil, estoque físico, diferença, NCM, data de última compra/venda, localização e preços.',
   parameters: {
     type: Type.OBJECT,
     properties: {
       codigo: {
         type: Type.STRING,
-        description: 'O código do produto a ser consultado (ex: 70200821, XYZ-123).'
+        description: 'O código do produto a ser consultado (ex: 70200821, 922503600034E, 789123456).'
       }
     },
     required: ['codigo']
@@ -23,22 +22,76 @@ export const toolConsultarProdutoPorCodigo = {
 
 export const toolConsultarProdutosPorTermo = {
   name: 'consultar_produtos_por_termo',
-  description: 'Busca produtos pela descrição textual aproximada. Use quando o usuário procurar por nome, característica ou categoria em vez de um código numérico. Retorna no máximo 10 itens.',
+  description: 'Busca produtos pela descrição textual aproximada. Use quando o usuário procurar por nome, característica ou categoria. Retorna até 10 itens com estoque contábil, físico, NCM, última compra e localização.',
   parameters: {
     type: Type.OBJECT,
     properties: {
       termo: {
         type: Type.STRING,
-        description: 'O termo de busca (ex: "mangueira", "parafuso 10mm", "óleo motor").'
+        description: 'O termo de busca (ex: "mangueira", "parafuso cabecote", "anel trava").'
       }
     },
     required: ['termo']
   }
 };
 
+export const toolConsultarProdutosPorCorredor = {
+  name: 'consultar_produtos_por_corredor',
+  description: 'Consulta produtos situados em um determinado corredor (e opcionalmente baia/nível) no estoque, permitindo filtrar por preço máximo ou se tem estoque disponível. Retorna tabela com produtos, estoque contábil, físico, localização, preços e última compra.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      corredor: {
+        type: Type.STRING,
+        description: 'Número ou identificador do corredor (ex: "01", "02", "03").'
+      },
+      preco_maximo: {
+        type: Type.NUMBER,
+        description: 'Opcional. Valor máximo de preço mínimo ou sugerido (ex: 10 para buscar produtos de até R$ 10,00).'
+      },
+      apenas_com_estoque: {
+        type: Type.BOOLEAN,
+        description: 'Opcional. Se true, filtra apenas produtos com estoque contábil ou físico maior que zero.'
+      },
+      limite: {
+        type: Type.NUMBER,
+        description: 'Opcional. Quantidade máxima de produtos a retornar (padrão 10, máximo 25).'
+      }
+    },
+    required: ['corredor']
+  }
+};
+
+export const toolConsultarRankingEstoque = {
+  name: 'consultar_ranking_estoque',
+  description: 'Consulta os produtos com maior ou menor estoque (contábil ou físico) no almoxarifado. Use quando o usuário perguntar quais produtos têm mais/menos estoque.',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      tipo_estoque: {
+        type: Type.STRING,
+        description: 'Tipo de estoque a ordenar: "contabil" ou "fisico". Padrão é "contabil".'
+      },
+      ordem: {
+        type: Type.STRING,
+        description: 'Sentido da ordenação: "maior" (do maior para o menor) ou "menor" (do menor para o maior). Padrão é "maior".'
+      },
+      corredor: {
+        type: Type.STRING,
+        description: 'Opcional. Restringir a busca a um corredor específico.'
+      },
+      limite: {
+        type: Type.NUMBER,
+        description: 'Opcional. Número de itens a retornar (padrão 10, máximo 20).'
+      }
+    },
+    required: []
+  }
+};
+
 export const toolAdicionarAoCarrinho = {
   name: 'adicionar_ao_carrinho',
-  description: 'Adiciona um produto ao carrinho (orçamento pendente) do usuário atual. Use quando o vendedor pedir para separar, adicionar ou cotar uma certa quantidade de uma peça. Importante: Você deve informar o código do produto que o usuário quer adicionar. Se o usuário forneceu apenas o nome, você DEVE consultar os produtos por termo primeiro e, em seguida, usar o código retornado na consulta para adicionar ao carrinho.',
+  description: 'Adiciona um produto ao carrinho (orçamento pendente) do usuário atual. Use quando o vendedor pedir para adicionar, cotar ou incluir itens.',
   parameters: {
     type: Type.OBJECT,
     properties: {
@@ -62,12 +115,8 @@ export const toolAdicionarAoCarrinho = {
 export const toolVerCarrinho = {
   name: 'ver_carrinho',
   description: 'Visualiza os itens atualmente no carrinho (orçamento pendente) do usuário logado, junto com o total.',
-  parameters: {
-    type: Type.OBJECT,
-    properties: {},
-    required: []
-  }
 };
+
 // ==========================================
 // IMPLEMENTAÇÃO (DATA-GROUNDED)
 // ==========================================
@@ -76,16 +125,25 @@ export async function executeConsultarProdutoPorCodigo(codigo: string): Promise<
   const pool = getDbPool();
   if (!pool) return { status: 'erro', mensagem: 'Banco de dados indisponível no momento.' };
   
+  const clean = codigo.trim().replace(/[?!.,;]/g, '');
   const client = await pool.connect();
   try {
     const res = await client.query(
-      `SELECT id, codigo_atual, codigo_fabrica, descricao, quantidade, corredor, baia, nivel, locacao, preco_sugerido, preco_minimo, preco_tabela
+      `SELECT id, codigo_atual, codigo_fabrica, codigo_barras_atual, descricao, 
+              quantidade as estoque_contabil, 
+              COALESCE(estoque_fisico, 0) as estoque_fisico,
+              (COALESCE(estoque_fisico, 0) - COALESCE(quantidade, 0)) as diferenca_estoque,
+              COALESCE(ncm, '') as ncm,
+              COALESCE(ultima_data_compra, '') as ultima_data_compra,
+              COALESCE(ultima_data_venda, '') as ultima_data_venda,
+              corredor, baia, nivel, locacao, 
+              preco_sugerido, preco_minimo, preco_tabela, custo_unitario
        FROM produtos 
        WHERE UPPER(codigo_atual) = UPPER($1) 
           OR UPPER(codigo_fabrica) = UPPER($1)
           OR UPPER(codigo_barras_atual) = UPPER($1)
        LIMIT 1`,
-      [codigo.trim()]
+      [clean]
     );
     
     if (res.rows.length === 0) {
@@ -113,12 +171,21 @@ export async function executeConsultarProdutosPorTermo(termo: string): Promise<a
   
   const client = await pool.connect();
   try {
-    const termos = termo.trim().split(/\s+/).filter(t => t.length > 0);
+    const clean = termo.trim().replace(/[?!.,;]/g, '');
+    const termos = clean.split(/\s+/).filter(t => t.length > 0);
     if (termos.length === 0) {
       return { status: 'erro', mensagem: 'Termo de busca vazio.' };
     }
 
-    let queryStr = `SELECT id, codigo_atual, codigo_fabrica, descricao, quantidade, locacao, preco_sugerido, preco_minimo 
+    let queryStr = `SELECT id, codigo_atual, codigo_fabrica, codigo_barras_atual, descricao, 
+                           quantidade as estoque_contabil, 
+                           COALESCE(estoque_fisico, 0) as estoque_fisico,
+                           (COALESCE(estoque_fisico, 0) - COALESCE(quantidade, 0)) as diferenca_estoque,
+                           COALESCE(ncm, '') as ncm,
+                           COALESCE(ultima_data_compra, '') as ultima_data_compra,
+                           COALESCE(ultima_data_venda, '') as ultima_data_venda,
+                           corredor, baia, nivel, locacao, 
+                           preco_sugerido, preco_minimo, preco_tabela 
                     FROM produtos WHERE `;
     const conditions: string[] = [];
     const values: any[] = [];
@@ -147,6 +214,122 @@ export async function executeConsultarProdutosPorTermo(termo: string): Promise<a
   } catch (err: any) {
     console.error('[GeminiTools] Erro ao consultar_produtos_por_termo:', err);
     return { status: 'erro', mensagem: 'Falha interna ao consultar o banco de dados.' };
+  } finally {
+    client.release();
+  }
+}
+
+export async function executeConsultarProdutosPorCorredor(
+  corredor: string,
+  preco_maximo?: number,
+  apenas_com_estoque?: boolean,
+  limite: number = 10
+): Promise<any> {
+  const pool = getDbPool();
+  if (!pool) return { status: 'erro', mensagem: 'Banco de dados indisponível no momento.' };
+
+  const client = await pool.connect();
+  try {
+    const lim = Math.min(25, Math.max(1, limite || 10));
+    const cleanCorredor = corredor.trim().padStart(2, '0');
+    
+    const conditions: string[] = ['(corredor = $1 OR corredor = $2)'];
+    const values: any[] = [cleanCorredor, corredor.trim()];
+    let paramIdx = 3;
+
+    if (preco_maximo !== undefined && preco_maximo > 0) {
+      conditions.push(`(preco_minimo <= $${paramIdx} OR preco_sugerido <= $${paramIdx})`);
+      values.push(preco_maximo);
+      paramIdx++;
+    }
+
+    if (apenas_com_estoque) {
+      conditions.push('(quantidade > 0 OR estoque_fisico > 0)');
+    }
+
+    values.push(lim);
+    const query = `
+      SELECT codigo_atual, codigo_fabrica, descricao,
+             quantidade as estoque_contabil,
+             COALESCE(estoque_fisico, 0) as estoque_fisico,
+             COALESCE(ncm, '') as ncm,
+             COALESCE(ultima_data_compra, '') as ultima_data_compra,
+             corredor, baia, nivel, locacao,
+             preco_sugerido, preco_minimo
+      FROM produtos
+      WHERE ${conditions.join(' AND ')}
+      ORDER BY baia ASC, nivel ASC, descricao ASC
+      LIMIT $${paramIdx}
+    `;
+
+    const res = await client.query(query, values);
+    return {
+      status: 'sucesso',
+      total_encontrados: res.rows.length,
+      corredor: cleanCorredor,
+      produtos: res.rows
+    };
+  } catch (err: any) {
+    console.error('[GeminiTools] Erro ao consultar_produtos_por_corredor:', err);
+    return { status: 'erro', mensagem: 'Falha interna ao consultar produtos do corredor.' };
+  } finally {
+    client.release();
+  }
+}
+
+export async function executeConsultarRankingEstoque(
+  tipo_estoque: string = 'contabil',
+  ordem: string = 'maior',
+  corredor?: string,
+  limite: number = 10
+): Promise<any> {
+  const pool = getDbPool();
+  if (!pool) return { status: 'erro', mensagem: 'Banco de dados indisponível no momento.' };
+
+  const client = await pool.connect();
+  try {
+    const lim = Math.min(20, Math.max(1, limite || 10));
+    const campo = tipo_estoque === 'fisico' ? 'COALESCE(estoque_fisico, 0)' : 'COALESCE(quantidade, 0)';
+    const dir = ordem === 'menor' ? 'ASC' : 'DESC';
+
+    const conditions: string[] = [];
+    const values: any[] = [];
+    let paramIdx = 1;
+
+    if (corredor && corredor.trim()) {
+      const cleanCorr = corredor.trim().padStart(2, '0');
+      conditions.push(`(corredor = $${paramIdx} OR corredor = $${paramIdx + 1})`);
+      values.push(cleanCorr, corredor.trim());
+      paramIdx += 2;
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    values.push(lim);
+
+    const query = `
+      SELECT codigo_atual, codigo_fabrica, descricao,
+             quantidade as estoque_contabil,
+             COALESCE(estoque_fisico, 0) as estoque_fisico,
+             (COALESCE(estoque_fisico, 0) - COALESCE(quantidade, 0)) as diferenca_estoque,
+             COALESCE(ncm, '') as ncm,
+             COALESCE(ultima_data_compra, '') as ultima_data_compra,
+             corredor, baia, nivel, locacao
+      FROM produtos
+      ${whereClause}
+      ORDER BY ${campo} ${dir}
+      LIMIT $${paramIdx}
+    `;
+
+    const res = await client.query(query, values);
+    return {
+      status: 'sucesso',
+      tipo_ordenacao: `${tipo_estoque} (${ordem})`,
+      total_retornados: res.rows.length,
+      produtos: res.rows
+    };
+  } catch (err: any) {
+    console.error('[GeminiTools] Erro ao consultar_ranking_estoque:', err);
+    return { status: 'erro', mensagem: 'Falha interna ao consultar ranking de estoque.' };
   } finally {
     client.release();
   }

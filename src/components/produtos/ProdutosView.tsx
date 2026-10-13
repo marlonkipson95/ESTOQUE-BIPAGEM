@@ -163,6 +163,9 @@ export const ProdutosView: React.FC<ProdutosViewProps> = ({
                   </div>
                 </th>
                 <th className="py-3.5 px-4 font-bold uppercase tracking-wider">
+                  NCM
+                </th>
+                <th className="py-3.5 px-4 font-bold uppercase tracking-wider">
                   Cód. Barras / Fábrica
                 </th>
                 <th
@@ -179,9 +182,15 @@ export const ProdutosView: React.FC<ProdutosViewProps> = ({
                   className="cursor-pointer py-3.5 px-4 font-bold uppercase tracking-wider text-right hover:text-indigo-600"
                 >
                   <div className="flex items-center justify-end gap-1">
-                    <span>Estoque</span>
+                    <span>Est. Contábil</span>
                     <ArrowUpDown className="h-3 w-3" />
                   </div>
+                </th>
+                <th className="py-3.5 px-4 font-bold uppercase tracking-wider text-right">
+                  Est. Físico
+                </th>
+                <th className="py-3.5 px-4 font-bold uppercase tracking-wider text-center">
+                  Última Compra
                 </th>
                 <th className="py-3.5 px-4 text-center font-bold uppercase tracking-wider">
                   Ações
@@ -213,6 +222,12 @@ export const ProdutosView: React.FC<ProdutosViewProps> = ({
                     </td>
 
                     <td className="py-3.5 px-4 font-mono text-slate-600 dark:text-slate-300">
+                      <span className="rounded bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] font-medium">
+                        {product.ncm || '—'}
+                      </span>
+                    </td>
+
+                    <td className="py-3.5 px-4 font-mono text-slate-600 dark:text-slate-300">
                       <div>EAN: {product.codigo_barras_atual || '—'}</div>
                       <div className="text-[11px] text-slate-400">Fábrica: {product.codigo_fabrica || '—'}</div>
                     </td>
@@ -232,11 +247,27 @@ export const ProdutosView: React.FC<ProdutosViewProps> = ({
                         className={`rounded px-2 py-0.5 text-xs ${
                           product.quantidade <= 0
                             ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
-                            : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200'
+                            : 'bg-indigo-50 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300'
                         }`}
                       >
                         {product.quantidade} un
                       </span>
+                    </td>
+
+                    <td className="py-3.5 px-4 text-right font-mono font-bold">
+                      <span
+                        className={`rounded px-2 py-0.5 text-xs ${
+                          (product.estoque_fisico ?? 0) <= 0
+                            ? 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                            : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                        }`}
+                      >
+                        {product.estoque_fisico ?? 0} un
+                      </span>
+                    </td>
+
+                    <td className="py-3.5 px-4 text-center font-mono text-xs text-slate-600 dark:text-slate-300">
+                      {product.ultima_data_compra || '—'}
                     </td>
 
                     <td className="py-3.5 px-4 text-center">
@@ -270,31 +301,47 @@ export const ProdutosView: React.FC<ProdutosViewProps> = ({
                 <span className="font-mono text-xs font-bold text-indigo-600 dark:text-indigo-400">
                   {product.codigo_atual}
                 </span>
-                <span
-                  className={`rounded px-2 py-0.5 text-xs font-mono font-bold shrink-0 ${
-                    product.quantidade <= 0
-                      ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
-                      : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
-                  }`}
-                >
-                  {product.quantidade} un
-                </span>
+                <div className="flex items-center gap-1.5">
+                  <span
+                    className={`rounded px-2 py-0.5 text-[11px] font-mono font-bold shrink-0 ${
+                      product.quantidade <= 0
+                        ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
+                        : 'bg-indigo-50 text-indigo-800 dark:bg-indigo-950/60 dark:text-indigo-300'
+                    }`}
+                  >
+                    Contábil: {product.quantidade} un
+                  </span>
+                  <span
+                    className={`rounded px-2 py-0.5 text-[11px] font-mono font-bold shrink-0 ${
+                      (product.estoque_fisico ?? 0) <= 0
+                        ? 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                        : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                    }`}
+                  >
+                    Físico: {product.estoque_fisico ?? 0} un
+                  </span>
+                </div>
               </div>
 
               <h3 className="text-sm font-bold text-slate-900 dark:text-white leading-snug line-clamp-2">
                 {product.descricao}
               </h3>
 
-              {/* Destaque do Código de Fábrica / EAN no Mobile */}
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-mono">
+              {/* Destaque do Código de Fábrica / EAN / NCM no Mobile */}
+              <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-mono">
                 {product.codigo_fabrica && (
                   <span className="rounded bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-100 dark:border-indigo-900">
                     Fábrica: {product.codigo_fabrica}
                   </span>
                 )}
-                {product.codigo_barras_atual && (
-                  <span className="text-slate-500 text-[11px]">
-                    EAN: {product.codigo_barras_atual}
+                {product.ncm && (
+                  <span className="rounded bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] text-slate-700 dark:text-slate-300">
+                    NCM: {product.ncm}
+                  </span>
+                )}
+                {product.ultima_data_compra && (
+                  <span className="text-[11px] text-slate-500">
+                    Últ. compra: {product.ultima_data_compra}
                   </span>
                 )}
               </div>

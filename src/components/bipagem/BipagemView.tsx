@@ -1227,7 +1227,7 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
                 </div>
               </div>
 
-              {/* Informações Complementares dos Códigos e Estoque */}
+              {/* Informações Complementares dos Códigos e NCM */}
               <div className="mt-5 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 text-xs">
                 <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                   <div className="flex items-center justify-between">
@@ -1263,10 +1263,48 @@ export const BipagemView: React.FC<BipagemViewProps> = ({
                   </strong>
                 </div>
 
-                <div className="rounded-xl bg-emerald-50 p-3 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/40">
-                  <span className="block text-emerald-800 dark:text-emerald-400 font-medium">Estoque Atual</span>
-                  <strong className="font-mono text-xl text-emerald-700 dark:text-emerald-300 block">
-                    {scanResult.product.quantidade} un
+                <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                  <span className="block text-slate-400 font-medium">NCM Fiscal</span>
+                  <strong className="font-mono text-sm text-indigo-600 dark:text-indigo-400 truncate block mt-0.5">
+                    {scanResult.product.ncm || '—'}
+                  </strong>
+                </div>
+              </div>
+
+              {/* BLOCO DE ESTOQUE AUDITADO: CONTÁBIL, FÍSICO, DIFERENÇA E ÚLTIMA COMPRA */}
+              <div className="mt-3 grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 text-xs">
+                <div className="rounded-xl bg-indigo-50/70 p-3 dark:bg-indigo-950/30 border border-indigo-200 dark:border-indigo-900/40">
+                  <span className="block text-indigo-700 dark:text-indigo-300 font-bold uppercase text-[10px] tracking-wider">Estoque Contábil</span>
+                  <strong className="font-mono text-xl text-indigo-900 dark:text-indigo-200 block mt-0.5">
+                    {scanResult.product.quantidade ?? 0} un
+                  </strong>
+                </div>
+
+                <div className="rounded-xl bg-emerald-50/70 p-3 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900/40">
+                  <span className="block text-emerald-700 dark:text-emerald-300 font-bold uppercase text-[10px] tracking-wider">Estoque Físico</span>
+                  <strong className="font-mono text-xl text-emerald-800 dark:text-emerald-200 block mt-0.5">
+                    {scanResult.product.estoque_fisico ?? 0} un
+                  </strong>
+                </div>
+
+                <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                  <span className="block text-slate-500 dark:text-slate-400 font-bold uppercase text-[10px] tracking-wider">Diferença</span>
+                  <strong className={`font-mono text-xl block mt-0.5 ${
+                    ((scanResult.product.estoque_fisico ?? 0) - (scanResult.product.quantidade ?? 0)) < 0 
+                      ? 'text-rose-600 dark:text-rose-400' 
+                      : ((scanResult.product.estoque_fisico ?? 0) - (scanResult.product.quantidade ?? 0)) > 0 
+                      ? 'text-emerald-600 dark:text-emerald-400' 
+                      : 'text-slate-700 dark:text-slate-300'
+                  }`}>
+                    {((scanResult.product.estoque_fisico ?? 0) - (scanResult.product.quantidade ?? 0)) > 0 ? '+' : ''}
+                    {(scanResult.product.estoque_fisico ?? 0) - (scanResult.product.quantidade ?? 0)} un
+                  </strong>
+                </div>
+
+                <div className="rounded-xl bg-slate-50 p-3 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                  <span className="block text-slate-500 dark:text-slate-400 font-bold uppercase text-[10px] tracking-wider">Última Compra</span>
+                  <strong className="font-mono text-sm text-slate-900 dark:text-white block mt-1">
+                    {scanResult.product.ultima_data_compra || 'Não informada'}
                   </strong>
                 </div>
               </div>

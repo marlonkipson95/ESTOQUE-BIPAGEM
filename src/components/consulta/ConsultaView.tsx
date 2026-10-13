@@ -664,6 +664,20 @@ export const ConsultaView: React.FC<ConsultaViewProps> = ({
                         {product.descricao}
                       </h3>
 
+                      {/* NCM E DATA DE ÚLTIMA COMPRA */}
+                      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+                        {product.ncm && (
+                          <span className="rounded bg-slate-100 dark:bg-slate-800 px-2 py-0.5 text-[11px] font-mono text-slate-700 dark:text-slate-300">
+                            NCM: <strong>{product.ncm}</strong>
+                          </span>
+                        )}
+                        {product.ultima_data_compra && (
+                          <span className="text-[11px] text-slate-500 dark:text-slate-400">
+                            Últ. compra: <strong>{product.ultima_data_compra}</strong>
+                          </span>
+                        )}
+                      </div>
+
                       {/* 3. LOCALIZAÇÃO FÍSICA NO ESTOQUE */}
                       <div className="mt-3.5">
                         <div className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1 flex items-center gap-1">

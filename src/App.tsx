@@ -96,7 +96,14 @@ export default function App() {
       // We explicitly do NOT clear storageService here to preserve offline queues.
     };
     window.addEventListener('auth-error', handleAuthError);
-    return () => window.removeEventListener('auth-error', handleAuthError);
+    const handleProductsLoaded = () => {
+      setProducts(storageService.getProducts());
+    };
+    window.addEventListener('kipson-products-loaded', handleProductsLoaded);
+    return () => {
+      window.removeEventListener('auth-error', handleAuthError);
+      window.removeEventListener('kipson-products-loaded', handleProductsLoaded);
+    };
   }, []);
 
   useEffect(() => {

@@ -10,6 +10,7 @@ import {
 } from '../types';
 import { apiService } from './apiService';
 import { parseScannedLabel } from '../utils/barcodeParser';
+import { idbGet, idbSet } from '../utils/idb';
 import {
   INITIAL_PRODUCTS,
   INITIAL_CODE_HISTORY,
@@ -53,6 +54,21 @@ class StorageService {
   constructor() {
     this.cleanupLegacyFictitiousData();
     this.setupNetworkListeners();
+    this.initIndexedDBCache();
+  }
+
+  async initIndexedDBCache(): Promise<void> {
+    try {
+      const cached = await idbGet<Product[]>(STORAGE_KEYS.PRODUCTS);
+      if (cached && Array.isArray(cached) && cached.length > 0) {
+        if (!this.inMemoryProducts || this.inMemoryProducts.length === 0) {
+          this.inMemoryProducts = cached;
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('kipson-products-loaded'));
+          }
+        }
+      }
+    } catch {}
   }
 
   private setupNetworkListeners(): void {
@@ -140,6 +156,7 @@ class StorageService {
   saveProducts(products: Product[]): void {
     this.inMemoryProducts = products;
     this.set(STORAGE_KEYS.PRODUCTS, products);
+    idbSet(STORAGE_KEYS.PRODUCTS, products).catch(() => {});
   }
 
   getProductById(id: string): Product | undefined {

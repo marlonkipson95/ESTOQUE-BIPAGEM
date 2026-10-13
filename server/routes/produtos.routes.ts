@@ -96,6 +96,11 @@ async function loadProductExtras(client: any, product: any) {
   product.preco_tabela = Number(product.preco_tabela) || 0;
   product.preco_sugerido = Number(product.preco_sugerido) || 0;
   product.preco_minimo = Number(product.preco_minimo) || 0;
+  product.quantidade = Number(product.quantidade) || 0;
+  product.estoque_fisico = Number(product.estoque_fisico) || 0;
+  product.ncm = product.ncm || '';
+  product.ultima_data_compra = product.ultima_data_compra || '';
+  product.ultima_data_venda = product.ultima_data_venda || '';
   return product;
 }
 
@@ -657,11 +662,15 @@ produtosRouter.get('/produtos', async (req: Request, res: Response) => {
         const formattedProducts = dataRes.rows.map(p => ({
           ...p,
           quantidade: Number(p.quantidade) || 0,
+          estoque_fisico: Number(p.estoque_fisico) || 0,
           estoque_minimo: Number(p.estoque_minimo) || 0,
           custo_unitario: Number(p.custo_unitario) || 0,
           preco_tabela: Number(p.preco_tabela) || 0,
           preco_sugerido: Number(p.preco_sugerido) || 0,
           preco_minimo: Number(p.preco_minimo) || 0,
+          ncm: p.ncm || '',
+          ultima_data_compra: p.ultima_data_compra || '',
+          ultima_data_venda: p.ultima_data_venda || '',
           total_genericos: Number(p.total_genericos) || 0,
         }));
 
